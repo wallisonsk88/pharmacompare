@@ -133,6 +133,7 @@ export default function Import() {
                 const productName = String(row[productCol] || '').trim();
                 const eanVal = eanCol !== -1 ? String(row[eanCol] || '').trim() : '';
                 let priceStr = String(row[priceCol] || '');
+                const originalPrice = priceStr; // Para debug
 
                 // Limpeza mais robusta do preço
                 priceStr = priceStr
@@ -142,6 +143,19 @@ export default function Import() {
                     .replace(',', '.'); // Converte vírgula decimal para ponto
 
                 const priceVal = parseFloat(priceStr);
+
+                // Debug: mostrar primeiras 5 linhas no console
+                if (i <= 5) {
+                    console.log(`Linha ${i}:`, {
+                        productName,
+                        priceCol,
+                        rawValue: row[priceCol],
+                        originalPrice,
+                        cleanedPrice: priceStr,
+                        parsedPrice: priceVal,
+                        isValid: !isNaN(priceVal) && priceVal > 0
+                    });
+                }
 
                 if (!productName || productName.length < 2 || isNaN(priceVal) || priceVal <= 0) {
                     results.errors++;
