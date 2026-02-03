@@ -90,35 +90,57 @@ export default function Import() {
 
             // Identificar colunas automaticamente com detecção mais robusta
             const header = rows[0].map(h => String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-            let productCol = -1, priceCol = -1, eanCol = -1;
+            let productCol = 0; // Sempre usar primeira coluna como produto
+            let priceCol = -1, eanCol = -1;
 
             // Palavras-chave para cada tipo de coluna
-            const productKeywords = ['produto', 'medicamento', 'nome', 'descri', 'item', 'descricao'];
-            const priceKeywords = ['preco', 'valor', 'pmc', 'custo', 'unit', 'venda', 'tabela', 'preço', 'rs', 'r$'];
-            const eanKeywords = ['ean', 'barras', 'barcode', 'cod', 'codigo', 'gtin'];
+            const priceKeywords = ['preco', 'valor', 'pmc', 'custo', 'unit', 'venda', 'tabela'];
+            const eanKeywords = ['ean', 'barras', 'barcode', 'gtin'];
 
             header.forEach((h, i) => {
-                if (productCol === -1 && productKeywords.some(k => h.includes(k))) productCol = i;
-                if (priceKeywords.some(k => h.includes(k))) priceCol = i; // Pega a última ocorrência de preço
+                if (priceCol === -1 && priceKeywords.some(k => h.includes(k))) priceCol = i;
                 if (eanCol === -1 && eanKeywords.some(k => h.includes(k))) eanCol = i;
             });
 
-            // Se não encontrou coluna de preço por nome, procura por padrão numérico na primeira linha de dados
+            // Se não encontrou coluna de preço por nome, procura por padrão de preço (R$ XX,XX) nos dados
             if (priceCol === -1 && rows.length > 1) {
                 const firstDataRow = rows[1];
-                for (let i = firstDataRow.length - 1; i >= 0; i--) {
+                for (let i = 0; i < firstDataRow.length; i++) {
                     const val = String(firstDataRow[i] || '');
-                    if (/^[R$\s]*[\d.,]+$/.test(val.trim())) {
+                    // Detecta padrões como "R$ 20,00" ou "20,00" ou "R$20.00"
+                    if (/R\$\s*\d/.test(val) || /^\d{1,6}[,\.]\d{2}\s*$/.test(val.trim())) {
                         priceCol = i;
+                        console.log(`Coluna de preço detectada pelo conteúdo: ${i} (valor: "${val}")`);
                         break;
                     }
                 }
             }
 
-            if (productCol === -1) productCol = 0;
-            if (priceCol === -1) priceCol = rows[0].length - 1;
+            // Se ainda não encontrou, verificar se alguma coluna tem "R$" nos dados
+            if (priceCol === -1 && rows.length > 1) {
+                for (let i = 0; i < rows[1].length; i++) {
+                    const val = String(rows[1][i] || '');
+                    if (val.includes('R$') || val.includes('r$')) {
+                        priceCol = i;
+                        console.log(`Coluna de preço encontrada com R$: ${i}`);
+                        break;
+                    }
+                }
+            }
+
+            if (priceCol === -1) {
+                priceCol = 1; // Fallback: segunda coluna é normalmente o preço
+                console.log('Fallback: usando coluna 1 como preço');
+            }
+
+            // Se a coluna de produto e preço são iguais, ajustar
+            if (productCol === priceCol) {
+                productCol = 0;
+                priceCol = 1;
+            }
 
             console.log('Colunas detectadas:', { productCol, priceCol, eanCol, header: rows[0] });
+            console.log('Exemplo de dados - Produto:', rows[1][productCol], '| Preço:', rows[1][priceCol]);
 
             const results = { success: 0, errors: 0, total: rows.length - 1 };
             const existingProducts = await getProducts();
