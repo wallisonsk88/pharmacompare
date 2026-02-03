@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, Check, Loader, Building2, Plus, FileSpreadsheet, X, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { getDistributors, createDistributor, getProducts, createProduct, createPrice } from '../config/supabase';
+import { getDistributors, createDistributor, getProducts, createProduct, createPrice, createProductsBatch, createPricesBatch } from '../config/supabase';
 
 export default function Import() {
     const [distributors, setDistributors] = useState([]);
@@ -11,6 +11,7 @@ export default function Import() {
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
     const [dragActive, setDragActive] = useState(false);
+    const [progress, setProgress] = useState({ current: 0, total: 0 });
     const fileInputRef = useRef(null);
 
     useEffect(() => { loadDistributors(); }, []);
@@ -87,64 +88,150 @@ export default function Import() {
                 return;
             }
 
-            // Identificar colunas automaticamente
-            const header = rows[0].map(h => String(h || '').toLowerCase());
+            // Identificar colunas automaticamente com detecção mais robusta
+            const header = rows[0].map(h => String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
             let productCol = -1, priceCol = -1, eanCol = -1;
 
+            // Palavras-chave para cada tipo de coluna
+            const productKeywords = ['produto', 'medicamento', 'nome', 'descri', 'item', 'descricao'];
+            const priceKeywords = ['preco', 'valor', 'pmc', 'custo', 'unit', 'venda', 'tabela', 'preço', 'rs', 'r$'];
+            const eanKeywords = ['ean', 'barras', 'barcode', 'cod', 'codigo', 'gtin'];
+
             header.forEach((h, i) => {
-                if (h.includes('produto') || h.includes('medicamento') || h.includes('nome') || h.includes('descri')) productCol = i;
-                if (h.includes('preço') || h.includes('preco') || h.includes('valor') || h.includes('pmc') || h.includes('custo') || h.includes('unit')) priceCol = i;
-                if (h.includes('ean') || h.includes('barras') || h.includes('barcode') || h.includes('cod')) eanCol = i;
+                if (productCol === -1 && productKeywords.some(k => h.includes(k))) productCol = i;
+                if (priceKeywords.some(k => h.includes(k))) priceCol = i; // Pega a última ocorrência de preço
+                if (eanCol === -1 && eanKeywords.some(k => h.includes(k))) eanCol = i;
             });
+
+            // Se não encontrou coluna de preço por nome, procura por padrão numérico na primeira linha de dados
+            if (priceCol === -1 && rows.length > 1) {
+                const firstDataRow = rows[1];
+                for (let i = firstDataRow.length - 1; i >= 0; i--) {
+                    const val = String(firstDataRow[i] || '');
+                    if (/^[R$\s]*[\d.,]+$/.test(val.trim())) {
+                        priceCol = i;
+                        break;
+                    }
+                }
+            }
 
             if (productCol === -1) productCol = 0;
             if (priceCol === -1) priceCol = rows[0].length - 1;
+
+            console.log('Colunas detectadas:', { productCol, priceCol, eanCol, header: rows[0] });
 
             const results = { success: 0, errors: 0, total: rows.length - 1 };
             const existingProducts = await getProducts();
             const productsMap = {};
             existingProducts.forEach(p => { productsMap[p.name.toLowerCase()] = p; });
 
+            // Preparar dados para processamento em lote
+            const itemsToProcess = [];
+
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
+                const productName = String(row[productCol] || '').trim();
+                const eanVal = eanCol !== -1 ? String(row[eanCol] || '').trim() : '';
+                let priceStr = String(row[priceCol] || '');
 
+                // Limpeza mais robusta do preço
+                priceStr = priceStr
+                    .replace(/R\$/gi, '')
+                    .replace(/\s/g, '')
+                    .replace(/\./g, '') // Remove pontos de milhar
+                    .replace(',', '.'); // Converte vírgula decimal para ponto
+
+                const priceVal = parseFloat(priceStr);
+
+                if (!productName || productName.length < 2 || isNaN(priceVal) || priceVal <= 0) {
+                    results.errors++;
+                    continue;
+                }
+
+                itemsToProcess.push({ productName, eanVal, priceVal });
+            }
+
+            setProgress({ current: 0, total: itemsToProcess.length });
+
+            // Processar em lotes de 100 para melhor performance
+            const BATCH_SIZE = 100;
+            const newProductsToCreate = [];
+            const pricesToCreate = [];
+
+            // Primeiro, identificar produtos novos
+            for (const item of itemsToProcess) {
+                if (!productsMap[item.productName.toLowerCase()]) {
+                    newProductsToCreate.push({
+                        name: item.productName,
+                        ean: item.eanVal,
+                        manufacturer: '',
+                        category: 'generico',
+                        unit: 'cx'
+                    });
+                    // Marca como pendente para evitar duplicatas
+                    productsMap[item.productName.toLowerCase()] = { pending: true };
+                }
+            }
+
+            // Criar produtos novos em lotes
+            for (let i = 0; i < newProductsToCreate.length; i += BATCH_SIZE) {
+                const batch = newProductsToCreate.slice(i, i + BATCH_SIZE);
                 try {
-                    const productName = String(row[productCol] || '').trim();
-                    const eanVal = eanCol !== -1 ? String(row[eanCol] || '').trim() : '';
-                    let priceStr = String(row[priceCol] || '');
-                    priceStr = priceStr.replace(/[R$\s]/g, '').replace(',', '.').replace(/[^\d.]/g, '');
-                    const priceVal = parseFloat(priceStr);
-
-                    if (!productName || productName.length < 2 || isNaN(priceVal) || priceVal <= 0) {
-                        results.errors++;
-                        continue;
+                    const createdProducts = await createProductsBatch(batch);
+                    createdProducts.forEach(p => {
+                        productsMap[p.name.toLowerCase()] = p;
+                    });
+                } catch (err) {
+                    console.error('Erro ao criar lote de produtos:', err);
+                    // Fallback: criar um por um
+                    for (const prod of batch) {
+                        try {
+                            const created = await createProduct(prod);
+                            productsMap[created.name.toLowerCase()] = created;
+                        } catch (e) {
+                            console.error('Erro ao criar produto:', e);
+                        }
                     }
+                }
+                setProgress({ current: Math.min(i + BATCH_SIZE, newProductsToCreate.length), total: newProductsToCreate.length + itemsToProcess.length });
+            }
 
-                    let product = productsMap[productName.toLowerCase()];
-                    if (!product) {
-                        product = await createProduct({
-                            name: productName,
-                            ean: eanVal,
-                            manufacturer: '',
-                            category: 'generico',
-                            unit: 'cx'
-                        });
-                        productsMap[productName.toLowerCase()] = product;
-                    }
-
-                    await createPrice({
+            // Preparar preços
+            for (const item of itemsToProcess) {
+                const product = productsMap[item.productName.toLowerCase()];
+                if (product && product.id) {
+                    pricesToCreate.push({
                         product_id: product.id,
                         distributor_id: selectedDistributor,
-                        price: priceVal,
+                        price: item.priceVal,
                         min_quantity: 1,
                         validity: null
                     });
-
-                    results.success++;
-                } catch (err) {
-                    console.error('Erro linha', i, err);
+                } else {
                     results.errors++;
                 }
+            }
+
+            // Criar preços em lotes
+            for (let i = 0; i < pricesToCreate.length; i += BATCH_SIZE) {
+                const batch = pricesToCreate.slice(i, i + BATCH_SIZE);
+                try {
+                    await createPricesBatch(batch);
+                    results.success += batch.length;
+                } catch (err) {
+                    console.error('Erro ao criar lote de preços:', err);
+                    // Fallback: criar um por um
+                    for (const price of batch) {
+                        try {
+                            await createPrice(price);
+                            results.success++;
+                        } catch (e) {
+                            console.error('Erro ao criar preço:', e);
+                            results.errors++;
+                        }
+                    }
+                }
+                setProgress({ current: newProductsToCreate.length + Math.min(i + BATCH_SIZE, pricesToCreate.length), total: newProductsToCreate.length + pricesToCreate.length });
             }
 
             setImportResult(results);
@@ -160,6 +247,7 @@ export default function Import() {
     const reset = () => {
         setImportResult(null);
         setSelectedDistributor('');
+        setProgress({ current: 0, total: 0 });
     };
 
     if (loading) {
@@ -263,7 +351,15 @@ export default function Import() {
                             <div className="upload-zone">
                                 <Loader size={48} className="loading-spinner" />
                                 <h3>Importando...</h3>
-                                <p>Processando arquivo, aguarde...</p>
+                                {progress.total > 0 && (
+                                    <>
+                                        <p>{progress.current} de {progress.total} itens processados</p>
+                                        <div style={{ width: '100%', maxWidth: 300, height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden', margin: '1rem auto' }}>
+                                            <div style={{ width: `${(progress.current / progress.total) * 100}%`, height: '100%', background: 'var(--accent-primary)', transition: 'width 0.3s ease' }} />
+                                        </div>
+                                    </>
+                                )}
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Processando arquivo, aguarde...</p>
                             </div>
                         ) : (
                             <div

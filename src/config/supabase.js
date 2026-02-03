@@ -135,6 +135,27 @@ export const createProduct = async (product) => {
   return newProduct;
 };
 
+// Batch insert para produtos (mais rápido)
+export const createProductsBatch = async (productList) => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(productList)
+      .select();
+    if (error) throw error;
+    return data || [];
+  }
+  const products = getLocalData('products');
+  const newProducts = productList.map(product => ({
+    ...product,
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+  }));
+  products.push(...newProducts);
+  setLocalData('products', products);
+  return newProducts;
+};
+
 export const updateProduct = async (id, updates) => {
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
@@ -236,6 +257,27 @@ export const createPrice = async (price) => {
   prices.push(newPrice);
   setLocalData('prices', prices);
   return newPrice;
+};
+
+// Batch insert para preços (mais rápido)
+export const createPricesBatch = async (priceList) => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from('prices')
+      .insert(priceList)
+      .select();
+    if (error) throw error;
+    return data || [];
+  }
+  const prices = getLocalData('prices');
+  const newPrices = priceList.map(price => ({
+    ...price,
+    id: crypto.randomUUID(),
+    recorded_at: new Date().toISOString(),
+  }));
+  prices.push(...newPrices);
+  setLocalData('prices', prices);
+  return newPrices;
 };
 
 export const updatePrice = async (id, updates) => {
