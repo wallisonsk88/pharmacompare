@@ -77,61 +77,42 @@ export default function Import() {
         const lines = text.split('\n').filter(line => line.trim());
         const tableRows = [];
 
-        // Padrões comuns em tabelas de preços de medicamentos
-        const pricePattern = /R?\$?\s*\d+[.,]\d{2}/g;
-        const eanPattern = /\d{13}/g;
+        // Padrão para encontrar preços: R$ XX,XX ou XX,XX ou XX.XX
+        const priceRegex = /R?\$?\s*(\d{1,6}[.,]\d{2})/;
 
-        // Tentar detectar linhas que parecem ser dados de tabela
         for (const line of lines) {
-            const hasPrice = pricePattern.test(line);
-            pricePattern.lastIndex = 0; // Reset regex
+            const priceMatch = line.match(priceRegex);
 
-            if (hasPrice) {
-                // Tentar dividir a linha em colunas
-                // Primeiro tenta por múltiplos espaços
-                let cols = line.split(/\s{2,}/).filter(c => c.trim());
+            if (priceMatch) {
+                // Encontrou um preço na linha
+                const priceValue = priceMatch[0].trim();
+                const priceIndex = line.indexOf(priceMatch[0]);
 
-                // Se não conseguiu dividir bem, tenta por tabulação
-                if (cols.length < 2) {
-                    cols = line.split('\t').filter(c => c.trim());
+                // Pegar o texto ANTES do preço como nome do produto
+                let productName = line.substring(0, priceIndex).trim();
+
+                // Se o nome estiver vazio, tentar pegar o texto DEPOIS do preço
+                if (!productName) {
+                    productName = line.substring(priceIndex + priceMatch[0].length).trim();
                 }
 
-                // Se ainda não conseguiu, tenta extrair campos individuais
-                if (cols.length < 2) {
-                    const parts = [];
-                    // Extrair preço
-                    const priceMatch = line.match(/R?\$?\s*(\d+[.,]\d{2})/);
-                    if (priceMatch) {
-                        // Pegar texto antes do preço como nome do produto
-                        const beforePrice = line.substring(0, line.indexOf(priceMatch[0])).trim();
-                        if (beforePrice) parts.push(beforePrice);
-                        parts.push(priceMatch[0]);
-                    }
-                    if (parts.length >= 2) cols = parts;
-                }
+                // Limpar o nome do produto (remover códigos de barras, números soltos no início)
+                productName = productName
+                    .replace(/^\d{13,}\s*/, '') // Remove EAN no início
+                    .replace(/^\d+\s+/, '')     // Remove números soltos no início
+                    .replace(/\s+\d{13,}$/, '') // Remove EAN no final
+                    .trim();
 
-                if (cols.length >= 2) {
-                    tableRows.push(cols);
+                // Só adicionar se tiver nome e preço válidos
+                if (productName && productName.length > 2) {
+                    tableRows.push([productName, priceValue]);
                 }
             }
         }
 
-        // Se encontrou linhas, adiciona cabeçalho genérico
+        // Retorna sempre com cabeçalho fixo: Produto e Preço
         if (tableRows.length > 0) {
-            const maxCols = Math.max(...tableRows.map(r => r.length));
-            const headers = ['Produto'];
-            for (let i = 1; i < maxCols - 1; i++) {
-                headers.push(`Coluna ${i + 1}`);
-            }
-            headers.push('Preço');
-
-            // Normalizar número de colunas em cada linha
-            const normalizedRows = tableRows.map(row => {
-                while (row.length < maxCols) row.splice(row.length - 1, 0, '');
-                return row.slice(0, maxCols);
-            });
-
-            return [headers, ...normalizedRows];
+            return [['Produto', 'Preço'], ...tableRows];
         }
 
         return [];
