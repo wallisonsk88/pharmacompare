@@ -1,224 +1,135 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Building2,
-    Pill,
-    DollarSign,
-    TrendingDown,
-    TrendingUp,
-    ArrowUpRight,
-    ArrowDownRight,
-    Package,
-    Clock,
-    Search
-} from 'lucide-react';
+import { Building2, Package, DollarSign, TrendingDown, Upload, GitCompare } from 'lucide-react';
 import { getDistributors, getProducts, getPrices } from '../config/supabase';
 
 export default function Dashboard({ onNavigate }) {
-    const [stats, setStats] = useState({
-        distributors: 0,
-        products: 0,
-        pricesRecorded: 0,
-        potentialSavings: 0
-    });
-    const [recentPrices, setRecentPrices] = useState([]);
+    const [stats, setStats] = useState({ distributors: 0, products: 0, prices: 0, saving: 0 });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadStats(); }, []);
 
-    const loadData = async () => {
+    const loadStats = async () => {
         try {
             const [distributors, products, prices] = await Promise.all([
-                getDistributors(),
-                getProducts(),
-                getPrices()
+                getDistributors(), getProducts(), getPrices()
             ]);
 
-            // Calcular economia potencial (diferença entre maior e menor preço por produto)
+            // Calcular economia potencial
+            let totalSaving = 0;
             const productPrices = {};
+
             prices.forEach(p => {
-                if (!productPrices[p.product_id]) {
-                    productPrices[p.product_id] = [];
-                }
+                if (!productPrices[p.product_id]) productPrices[p.product_id] = [];
                 productPrices[p.product_id].push(p.price);
             });
 
-            let totalSavings = 0;
             Object.values(productPrices).forEach(priceList => {
                 if (priceList.length > 1) {
-                    const max = Math.max(...priceList);
-                    const min = Math.min(...priceList);
-                    totalSavings += (max - min);
+                    const sorted = priceList.sort((a, b) => a - b);
+                    totalSaving += sorted[sorted.length - 1] - sorted[0];
                 }
             });
 
             setStats({
                 distributors: distributors.length,
                 products: products.length,
-                pricesRecorded: prices.length,
-                potentialSavings: totalSavings
+                prices: prices.length,
+                saving: totalSaving
             });
-
-            // Últimos preços registrados
-            setRecentPrices(prices.slice(0, 5));
-        } catch (error) {
-            console.error('Erro ao carregar dados:', error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e) { console.error(e); }
+        setLoading(false);
     };
 
-    const formatCurrency = (value) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value);
-    };
-
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    };
-
-    if (loading) {
-        return (
-            <div className="main-content">
-                <div className="empty-state loading">
-                    <Package size={64} />
-                    <h3>Carregando...</h3>
-                </div>
-            </div>
-        );
-    }
+    const formatCurrency = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
     return (
         <div className="main-content">
             <div className="page-header">
-                <h1 className="page-title">Dashboard</h1>
-                <p className="page-subtitle">Visão geral do seu comparador de preços</p>
+                <h1 className="page-title">Bem-vindo ao PharmaCompare</h1>
+                <p className="page-subtitle">Compare preços de medicamentos entre distribuidoras</p>
             </div>
 
-            {/* Stats Cards */}
-            <div className="stats-grid">
-                <div className="stat-card" onClick={() => onNavigate('distributors')} style={{ cursor: 'pointer' }}>
-                    <div className="stat-icon primary">
-                        <Building2 size={24} />
-                    </div>
+            {/* Estatísticas */}
+            <div className="stats-grid mb-xl">
+                <div className="stat-card">
+                    <div className="stat-icon primary"><Building2 size={24} /></div>
                     <div className="stat-content">
                         <div className="stat-value">{stats.distributors}</div>
                         <div className="stat-label">Distribuidoras</div>
                     </div>
                 </div>
-
-                <div className="stat-card" onClick={() => onNavigate('products')} style={{ cursor: 'pointer' }}>
-                    <div className="stat-icon accent">
-                        <Pill size={24} />
-                    </div>
+                <div className="stat-card">
+                    <div className="stat-icon info"><Package size={24} /></div>
                     <div className="stat-content">
                         <div className="stat-value">{stats.products}</div>
                         <div className="stat-label">Medicamentos</div>
                     </div>
                 </div>
-
-                <div className="stat-card" onClick={() => onNavigate('prices')} style={{ cursor: 'pointer' }}>
-                    <div className="stat-icon info">
-                        <DollarSign size={24} />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-value">{stats.pricesRecorded}</div>
-                        <div className="stat-label">Preços Registrados</div>
-                    </div>
-                </div>
-
                 <div className="stat-card">
-                    <div className="stat-icon warning">
-                        <TrendingDown size={24} />
-                    </div>
+                    <div className="stat-icon warning"><DollarSign size={24} /></div>
                     <div className="stat-content">
-                        <div className="stat-value">{formatCurrency(stats.potentialSavings)}</div>
+                        <div className="stat-value">{stats.prices}</div>
+                        <div className="stat-label">Preços Cadastrados</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon accent"><TrendingDown size={24} /></div>
+                    <div className="stat-content">
+                        <div className="stat-value">{formatCurrency(stats.saving)}</div>
                         <div className="stat-label">Economia Potencial</div>
-                        <div className="stat-change positive">
-                            <TrendingDown size={12} />
-                            Comparando fornecedores
-                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="card mb-lg">
-                <div className="card-header">
-                    <h3 className="card-title">Comparação Rápida</h3>
+            {/* Ações Rápidas */}
+            <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>Começar</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-lg)' }}>
+                <div
+                    className="card"
+                    style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+                    onClick={() => onNavigate('import')}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <div className="flex items-center gap-md mb-md">
+                        <div className="stat-icon primary"><Upload size={24} /></div>
+                        <h3 style={{ margin: 0 }}>Importar Tabela</h3>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                        Selecione uma distribuidora e importe a tabela de preços dela
+                    </p>
                 </div>
-                <div className="search-bar">
-                    <Search size={20} />
-                    <input
-                        type="text"
-                        placeholder="Buscar medicamento para comparar preços..."
-                        onClick={() => onNavigate('compare')}
-                        readOnly
-                        style={{ cursor: 'pointer' }}
-                    />
-                </div>
-                <div className="flex gap-md">
-                    <button className="btn btn-primary" onClick={() => onNavigate('compare')}>
-                        <TrendingUp size={18} />
-                        Comparar Preços
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => onNavigate('import')}>
-                        <Package size={18} />
-                        Importar Tabela
-                    </button>
+
+                <div
+                    className="card"
+                    style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+                    onClick={() => onNavigate('compare')}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <div className="flex items-center gap-md mb-md">
+                        <div className="stat-icon accent"><GitCompare size={24} /></div>
+                        <h3 style={{ margin: 0 }}>Comparar Preços</h3>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                        Veja qual distribuidora tem o melhor preço para cada medicamento
+                    </p>
                 </div>
             </div>
 
-            {/* Recent Activity */}
-            <div className="card">
-                <div className="card-header">
-                    <h3 className="card-title">Últimos Preços Registrados</h3>
-                    <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('history')}>
-                        Ver Histórico
-                    </button>
+            {/* Instruções */}
+            {stats.products === 0 && (
+                <div className="card mt-xl" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--primary-500)' }}>
+                    <h3 className="card-title">🚀 Como usar</h3>
+                    <ol style={{ marginLeft: 'var(--spacing-lg)', marginTop: 'var(--spacing-md)', color: 'var(--text-secondary)' }}>
+                        <li style={{ marginBottom: 'var(--spacing-sm)' }}>Clique em <strong>"Importar Tabela"</strong></li>
+                        <li style={{ marginBottom: 'var(--spacing-sm)' }}>Selecione ou crie uma distribuidora</li>
+                        <li style={{ marginBottom: 'var(--spacing-sm)' }}>Faça upload da tabela (Excel ou CSV)</li>
+                        <li style={{ marginBottom: 'var(--spacing-sm)' }}>Repita para outras distribuidoras</li>
+                        <li>Vá em <strong>"Comparar Preços"</strong> para ver o melhor preço!</li>
+                    </ol>
                 </div>
-
-                {recentPrices.length === 0 ? (
-                    <div className="empty-state">
-                        <Clock size={48} />
-                        <h3>Nenhum preço registrado</h3>
-                        <p>Comece adicionando preços de medicamentos</p>
-                        <button className="btn btn-primary" onClick={() => onNavigate('prices')}>
-                            Adicionar Preço
-                        </button>
-                    </div>
-                ) : (
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>Medicamento</th>
-                                    <th>Distribuidora</th>
-                                    <th>Preço</th>
-                                    <th>Data</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentPrices.map(price => (
-                                    <tr key={price.id}>
-                                        <td>{price.products?.name || 'N/A'}</td>
-                                        <td>{price.distributors?.name || 'N/A'}</td>
-                                        <td className="price-highlight">{formatCurrency(price.price)}</td>
-                                        <td>{formatDate(price.recorded_at)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 }
