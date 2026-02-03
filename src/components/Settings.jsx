@@ -1,6 +1,6 @@
 import React from 'react';
-import { Settings, Database, Palette, Bell, Shield, HelpCircle } from 'lucide-react';
-import { isSupabaseConfigured } from '../config/supabase';
+import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { isSupabaseConfigured, clearAllData } from '../config/supabase';
 
 export default function SettingsPage() {
     return (
@@ -66,6 +66,40 @@ export default function SettingsPage() {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            {/* Zona de Perigo */}
+            <div className="card" style={{ marginTop: 'var(--space-lg)', borderColor: 'var(--accent-danger)' }}>
+                <h3 className="card-title mb-lg" style={{ color: 'var(--accent-danger)' }}><AlertTriangle size={20} /> Zona de Perigo</h3>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <div style={{ fontWeight: 600 }}>Limpar Todos os Dados</div>
+                        <div className="text-muted" style={{ fontSize: '0.85rem' }}>
+                            Exclui permanentemente todos os produtos, preços e histórico.
+                            <br />
+                            <strong>Esta ação é irreversível.</strong>
+                        </div>
+                    </div>
+                    <button
+                        className="btn btn-danger"
+                        onClick={async () => {
+                            if (confirm('TEM CERTEZA? Isso apagará TODOS os dados do sistema permanentemente.')) {
+                                if (confirm('Sério mesmo? Não haverá como recuperar.')) {
+                                    try {
+                                        await clearAllData();
+                                        alert('Banco de dados limpo com sucesso.');
+                                        window.location.reload();
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert('Erro ao limpar dados: ' + e.message);
+                                    }
+                                }
+                            }
+                        }}
+                    >
+                        <Trash2 size={18} /> Limpar Tudo
+                    </button>
                 </div>
             </div>
         </div>

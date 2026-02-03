@@ -4,12 +4,12 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Verificar se as credenciais estão configuradas
-const isConfigured = supabaseUrl && 
-  supabaseAnonKey && 
+const isConfigured = supabaseUrl &&
+  supabaseAnonKey &&
   supabaseUrl !== 'your-supabase-url-here' &&
   supabaseAnonKey !== 'your-supabase-anon-key-here';
 
-export const supabase = isConfigured 
+export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
@@ -187,7 +187,7 @@ export const getPrices = async () => {
   const prices = getLocalData('prices');
   const products = getLocalData('products');
   const distributors = getLocalData('distributors');
-  
+
   return prices.map(price => ({
     ...price,
     products: products.find(p => p.id === price.product_id),
@@ -210,7 +210,7 @@ export const getPricesByProduct = async (productId) => {
   }
   const prices = getLocalData('prices').filter(p => p.product_id === productId);
   const distributors = getLocalData('distributors');
-  
+
   return prices.map(price => ({
     ...price,
     distributors: distributors.find(d => d.id === price.distributor_id),
@@ -281,19 +281,43 @@ export const getPriceHistory = async (productId, distributorId = null) => {
       .select('*')
       .eq('product_id', productId)
       .order('recorded_at', { ascending: true });
-    
+
     if (distributorId) {
       query = query.eq('distributor_id', distributorId);
     }
-    
+
     const { data, error } = await query;
     if (error) throw error;
     return data;
   }
-  
+
   let prices = getLocalData('prices').filter(p => p.product_id === productId);
   if (distributorId) {
     prices = prices.filter(p => p.distributor_id === distributorId);
   }
   return prices.sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+};
+// Função para limpar todo o banco de dados
+export const clearAllData = async () => {
+  if (isSupabaseConfigured) {
+    // Excluir preços primeiro (embora o CASCADE deva tratar isso, é mais seguro)
+    const { error: errPrices } = await supabase.from('prices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (errPrices) throw errPrices;
+
+    // Excluir produtos
+    const { error: errProducts } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (errProducts) throw errProducts;
+
+    // Excluir distribuidoras
+    const { error: errDistributors } = await supabase.from('distributors').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (errDistributors) throw errDistributors;
+
+    return true;
+  }
+
+  // Limpar LocalStorage
+  localStorage.removeItem(STORAGE_KEYS.prices);
+  localStorage.removeItem(STORAGE_KEYS.products);
+  localStorage.removeItem(STORAGE_KEYS.distributors);
+  return true;
 };
