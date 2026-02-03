@@ -933,3 +933,127 @@ body {
     font-size: 1.5rem;
   }
 }
+
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  body {
+    background: white;
+    color: black;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Esconder elementos de navegação e controles */
+  .sidebar,
+  .search-box,
+  .page-header button,
+  .page-subtitle,
+  .btn,
+  .modal-overlay,
+  .card-title,
+  .upload-zone,
+  .search-hero,
+  .search-suggestions {
+    display: none !important;
+  }
+
+  /* Ajustar layout principal */
+  .app-layout {
+    display: block;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Ajustar cards para impressão */
+  .card {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Ajustar tabelas */
+  .table-container {
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+  }
+
+  .table th {
+    background: #f3f4f6 !important;
+    color: #000 !important;
+    border-bottom: 2px solid #000 !important;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .table td {
+    border-bottom: 1px solid #ddd !important;
+    color: #000 !important;
+    padding: 8px 4px !important;
+  }
+
+  /* Cores de texto */
+  .text-muted {
+    color: #444 !important;
+  }
+
+  .text-success,
+  .accent-success {
+    color: #000 !important;
+    font-weight: bold;
+  }
+
+  /* Header específico para impressão */
+  .page-header {
+    margin-bottom: 20px !important;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    display: block !important;
+  }
+
+  .page-title {
+    font-size: 18pt !important;
+    color: #000 !important;
+    margin: 0 !important;
+  }
+
+  /* Resumo da compra - forçar exibição correta */
+  div[style*="grid-template-columns"] {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  /* Ocultar colunas de ação e ícones */
+  .table th:last-child,
+  .table td:last-child {
+    display: none !important;
+  }
+
+  /* Esconder ícones e botões de quantidade */
+  .btn-ghost,
+  .stat-icon,
+  svg {
+    display: none !important;
+  }
+
+  /* Mas mostrar o texto da quantidade que estava entre botões */
+  .table td div.flex {
+    display: block !important;
+    text-align: center;
+  }
+}
