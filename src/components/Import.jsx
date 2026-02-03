@@ -216,6 +216,10 @@ export default function Import() {
             }
 
             // Preparar preços
+            console.log('=== PREPARANDO PREÇOS ===');
+            console.log('Total de itens a processar:', itemsToProcess.length);
+            console.log('Produtos no mapa:', Object.keys(productsMap).length);
+
             for (const item of itemsToProcess) {
                 const product = productsMap[item.productName.toLowerCase()];
                 if (product && product.id) {
@@ -227,16 +231,29 @@ export default function Import() {
                         validity: null
                     });
                 } else {
+                    if (!product) {
+                        console.log('Produto não encontrado:', item.productName);
+                    } else if (!product.id) {
+                        console.log('Produto sem ID:', item.productName, product);
+                    }
                     results.errors++;
                 }
+            }
+
+            console.log('Total de preços a criar:', pricesToCreate.length);
+            console.log('Distribuidora selecionada:', selectedDistributor);
+            if (pricesToCreate.length > 0) {
+                console.log('Primeiro preço:', pricesToCreate[0]);
             }
 
             // Criar preços em lotes
             for (let i = 0; i < pricesToCreate.length; i += BATCH_SIZE) {
                 const batch = pricesToCreate.slice(i, i + BATCH_SIZE);
                 try {
+                    console.log(`Criando lote ${i / BATCH_SIZE + 1} com ${batch.length} preços...`);
                     await createPricesBatch(batch);
                     results.success += batch.length;
+                    console.log(`Lote criado com sucesso!`);
                 } catch (err) {
                     console.error('Erro ao criar lote de preços:', err);
                     // Fallback: criar um por um
