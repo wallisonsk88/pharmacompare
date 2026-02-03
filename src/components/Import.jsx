@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Check, Loader, Building2, Plus, FileSpreadsheet } from 'lucide-react';
+import { Upload, Check, Loader, Building2, Plus, FileSpreadsheet, X, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getDistributors, createDistributor, getProducts, createProduct, createPrice } from '../config/supabase';
 
@@ -10,6 +10,7 @@ export default function Import() {
     const [loading, setLoading] = useState(true);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
+    const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
 
     useEffect(() => { loadDistributors(); }, []);
@@ -40,9 +41,36 @@ export default function Import() {
         }
     };
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !selectedDistributor) return;
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            processFile(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFileUpload = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            processFile(e.target.files[0]);
+        }
+    };
+
+    const processFile = async (file) => {
+        if (!selectedDistributor) {
+            alert('Selecione uma distribuidora primeiro!');
+            return;
+        }
 
         setImporting(true);
         setImportResult(null);
@@ -68,7 +96,6 @@ export default function Import() {
                 if (h.includes('preço') || h.includes('preco') || h.includes('valor') || h.includes('pmc') || h.includes('custo') || h.includes('unit')) priceCol = i;
             });
 
-            // Fallback: primeira coluna = produto, última = preço
             if (productCol === -1) productCol = 0;
             if (priceCol === -1) priceCol = rows[0].length - 1;
 
@@ -77,7 +104,6 @@ export default function Import() {
             const productsMap = {};
             existingProducts.forEach(p => { productsMap[p.name.toLowerCase()] = p; });
 
-            // Importar linhas
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
 
@@ -92,7 +118,6 @@ export default function Import() {
                         continue;
                     }
 
-                    // Criar ou buscar produto
                     let product = productsMap[productName.toLowerCase()];
                     if (!product) {
                         product = await createProduct({
@@ -105,7 +130,6 @@ export default function Import() {
                         productsMap[productName.toLowerCase()] = product;
                     }
 
-                    // Criar preço
                     await createPrice({
                         product_id: product.id,
                         distributor_id: selectedDistributor,
@@ -140,7 +164,7 @@ export default function Import() {
         return (
             <div className="main-content">
                 <div className="empty-state">
-                    <Loader size={48} className="loading" />
+                    <Loader size={48} className="loading-spinner" />
                     <h3>Carregando...</h3>
                 </div>
             </div>
@@ -151,41 +175,42 @@ export default function Import() {
         <div className="main-content">
             <div className="page-header">
                 <h1 className="page-title">📥 Importar Tabela de Preços</h1>
-                <p className="page-subtitle">Selecione a distribuidora e envie o arquivo Excel ou CSV</p>
+                <p className="page-subtitle">Selecione a distribuidora e faça upload do arquivo Excel ou CSV</p>
             </div>
 
             {importResult ? (
                 <div className="card text-center">
-                    <div style={{ padding: 'var(--spacing-xl)' }}>
-                        <div className="stat-icon green" style={{ width: 80, height: 80, margin: '0 auto var(--spacing-lg)', borderRadius: '50%' }}>
+                    <div style={{ padding: 'var(--space-2xl)' }}>
+                        <div className="stat-icon success" style={{ width: 80, height: 80, margin: '0 auto var(--space-lg)', borderRadius: '50%' }}>
                             <Check size={40} />
                         </div>
-                        <h2 style={{ marginBottom: 'var(--spacing-sm)' }}>Importação Concluída!</h2>
-                        <p style={{ fontSize: '1.25rem', marginBottom: 'var(--spacing-lg)' }}>
+                        <h2 style={{ marginBottom: 'var(--space-sm)', fontWeight: 700 }}>Importação Concluída!</h2>
+                        <p style={{ fontSize: '1.25rem', marginBottom: 'var(--space-lg)' }}>
                             <span className="text-success font-bold">{importResult.success}</span> de {importResult.total} produtos importados
                         </p>
                         {importResult.errors > 0 && (
-                            <p style={{ color: 'var(--warning)' }}>
+                            <div className="badge badge-warning" style={{ fontSize: '0.85rem', padding: 'var(--space-sm) var(--space-md)' }}>
+                                <AlertCircle size={16} />
                                 {importResult.errors} linhas ignoradas (sem nome ou preço válido)
-                            </p>
+                            </div>
                         )}
-                        <button className="btn btn-primary" onClick={reset} style={{ marginTop: 'var(--spacing-lg)' }}>
-                            Nova Importação
-                        </button>
+                        <div style={{ marginTop: 'var(--space-xl)' }}>
+                            <button className="btn btn-primary" onClick={reset}>
+                                Nova Importação
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : (
-                <>
+                <div style={{ display: 'grid', gap: 'var(--space-lg)' }}>
                     {/* Passo 1: Distribuidora */}
-                    <div className="card mb-lg">
-                        <div className="card-header">
-                            <h3 className="card-title flex items-center gap-sm">
-                                <Building2 size={20} />
-                                1. Selecione a Distribuidora
-                            </h3>
-                        </div>
+                    <div className="card">
+                        <h3 className="card-title mb-lg">
+                            <span style={{ background: 'var(--accent-primary)', color: 'white', width: 28, height: 28, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', marginRight: 'var(--space-sm)' }}>1</span>
+                            Selecione a Distribuidora
+                        </h3>
 
-                        <div className="flex gap-md" style={{ marginBottom: 'var(--spacing-md)' }}>
+                        <div className="flex gap-md mb-md">
                             <select
                                 className="form-select"
                                 value={selectedDistributor}
@@ -203,7 +228,7 @@ export default function Import() {
                             <input
                                 type="text"
                                 className="form-input"
-                                placeholder="Ou crie uma nova distribuidora..."
+                                placeholder="Ou digite para criar nova..."
                                 value={newDistributorName}
                                 onChange={(e) => setNewDistributorName(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleCreateDistributor()}
@@ -221,32 +246,36 @@ export default function Import() {
 
                     {/* Passo 2: Upload */}
                     <div className="card">
-                        <div className="card-header">
-                            <h3 className="card-title flex items-center gap-sm">
-                                <FileSpreadsheet size={20} />
-                                2. Envie o Arquivo
-                            </h3>
-                        </div>
+                        <h3 className="card-title mb-lg">
+                            <span style={{ background: selectedDistributor ? 'var(--accent-primary)' : 'var(--bg-tertiary)', color: selectedDistributor ? 'white' : 'var(--text-muted)', width: 28, height: 28, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', marginRight: 'var(--space-sm)' }}>2</span>
+                            Envie o Arquivo
+                        </h3>
 
                         {!selectedDistributor ? (
                             <div className="upload-zone" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
                                 <Upload size={48} />
                                 <h3>Primeiro selecione uma distribuidora</h3>
+                                <p>Você poderá fazer upload após selecionar</p>
                             </div>
                         ) : importing ? (
                             <div className="upload-zone">
-                                <Loader size={48} className="loading" />
+                                <Loader size={48} className="loading-spinner" />
                                 <h3>Importando...</h3>
                                 <p>Processando arquivo, aguarde...</p>
                             </div>
                         ) : (
                             <div
-                                className="upload-zone"
+                                className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
                                 onClick={() => fileInputRef.current?.click()}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                                style={dragActive ? { borderColor: 'var(--accent-primary)', background: 'var(--accent-primary-light)' } : {}}
                             >
-                                <Upload size={48} />
-                                <h3>Clique para selecionar arquivo</h3>
-                                <p>Excel (.xlsx) ou CSV</p>
+                                <FileSpreadsheet size={48} />
+                                <h3>Arraste o arquivo aqui ou clique para selecionar</h3>
+                                <p>Suporte para Excel (.xlsx) e CSV</p>
                             </div>
                         )}
 
@@ -258,12 +287,11 @@ export default function Import() {
                             style={{ display: 'none' }}
                         />
 
-                        <div style={{ marginTop: 'var(--spacing-lg)', padding: 'var(--spacing-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                            <strong>💡 Dica:</strong> O sistema identifica automaticamente as colunas de "Produto" e "Preço"
-                            pelo nome do cabeçalho. Se não encontrar, usa a primeira coluna como produto e a última como preço.
+                        <div style={{ marginTop: 'var(--space-lg)', padding: 'var(--space-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                            <strong style={{ color: 'var(--text-primary)' }}>💡 Dica:</strong> O sistema identifica automaticamente as colunas de "Produto" e "Preço" pelos nomes do cabeçalho.
                         </div>
                     </div>
-                </>
+                </div>
             )}
         </div>
     );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Upload, GitCompare, TrendingUp, Building2, Settings, Package } from 'lucide-react';
+import { GitCompare, Upload, Package, TrendingUp, Building2, Settings, BarChart3 } from 'lucide-react';
 
 export default function Sidebar({ currentPage, onNavigate }) {
     const menuItems = [
@@ -14,12 +14,13 @@ export default function Sidebar({ currentPage, onNavigate }) {
         <aside className="sidebar">
             <div className="sidebar-header">
                 <div className="logo">
-                    <span className="logo-icon">💊</span>
+                    <div className="logo-icon">💊</div>
                     <span className="logo-text">PharmaCompare</span>
                 </div>
             </div>
 
             <nav className="sidebar-nav">
+                <div className="nav-section-title">Menu Principal</div>
                 {menuItems.map(item => (
                     <button
                         key={item.id}

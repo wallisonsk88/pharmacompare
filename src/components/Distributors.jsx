@@ -1,283 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Building2,
-    Plus,
-    Search,
-    Edit2,
-    Trash2,
-    X,
-    Phone,
-    FileText
-} from 'lucide-react';
-import { getDistributors, createDistributor, updateDistributor, deleteDistributor } from '../config/supabase';
+import { Building2, Trash2, Plus, Edit2, Loader, X, AlertTriangle, Phone, FileText } from 'lucide-react';
+import { getDistributors, createDistributor, updateDistributor, deleteDistributor, getPrices, deletePrice } from '../config/supabase';
 
 export default function Distributors() {
     const [distributors, setDistributors] = useState([]);
+    const [prices, setPrices] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
-    const [editingDistributor, setEditingDistributor] = useState(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        cnpj: '',
-        contact: '',
-        notes: ''
-    });
+    const [showDeleteModal, setShowDeleteModal] = useState(null);
+    const [editingId, setEditingId] = useState(null);
+    const [form, setForm] = useState({ name: '', cnpj: '', contact: '', notes: '' });
+    const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        loadDistributors();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
-    const loadDistributors = async () => {
+    const loadData = async () => {
         try {
-            const data = await getDistributors();
-            setDistributors(data);
-        } catch (error) {
-            console.error('Erro ao carregar distribuidoras:', error);
-        } finally {
-            setLoading(false);
-        }
+            const [dists, allPrices] = await Promise.all([getDistributors(), getPrices()]);
+            setDistributors(dists);
+            setPrices(allPrices);
+        } catch (e) { console.error(e); }
+        setLoading(false);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const getDistPriceCount = (distId) => prices.filter(p => p.distributor_id === distId).length;
+
+    const handleSubmit = async () => {
+        if (!form.name.trim()) return;
+        setSaving(true);
         try {
-            if (editingDistributor) {
-                await updateDistributor(editingDistributor.id, formData);
+            if (editingId) {
+                await updateDistributor(editingId, form);
             } else {
-                await createDistributor(formData);
+                await createDistributor(form);
             }
-            await loadDistributors();
+            await loadData();
             closeModal();
-        } catch (error) {
-            console.error('Erro ao salvar distribuidora:', error);
-            alert('Erro ao salvar distribuidora');
-        }
+        } catch (e) { console.error(e); alert('Erro ao salvar'); }
+        setSaving(false);
     };
 
-    const handleDelete = async (id) => {
-        if (confirm('Tem certeza que deseja excluir esta distribuidora?')) {
-            try {
-                await deleteDistributor(id);
-                await loadDistributors();
-            } catch (error) {
-                console.error('Erro ao excluir distribuidora:', error);
-                alert('Erro ao excluir distribuidora');
-            }
-        }
-    };
-
-    const openModal = (distributor = null) => {
-        if (distributor) {
-            setEditingDistributor(distributor);
-            setFormData({
-                name: distributor.name,
-                cnpj: distributor.cnpj || '',
-                contact: distributor.contact || '',
-                notes: distributor.notes || ''
-            });
-        } else {
-            setEditingDistributor(null);
-            setFormData({ name: '', cnpj: '', contact: '', notes: '' });
-        }
+    const handleEdit = (dist) => {
+        setEditingId(dist.id);
+        setForm({ name: dist.name, cnpj: dist.cnpj || '', contact: dist.contact || '', notes: dist.notes || '' });
         setShowModal(true);
+    };
+
+    const handleDelete = async (dist) => {
+        setSaving(true);
+        try {
+            const distPrices = prices.filter(p => p.distributor_id === dist.id);
+            for (const price of distPrices) await deletePrice(price.id);
+            await deleteDistributor(dist.id);
+            await loadData();
+            setShowDeleteModal(null);
+        } catch (e) { console.error(e); alert('Erro ao excluir'); }
+        setSaving(false);
     };
 
     const closeModal = () => {
         setShowModal(false);
-        setEditingDistributor(null);
-        setFormData({ name: '', cnpj: '', contact: '', notes: '' });
+        setEditingId(null);
+        setForm({ name: '', cnpj: '', contact: '', notes: '' });
     };
 
-    const filteredDistributors = distributors.filter(d =>
-        d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (d.cnpj && d.cnpj.includes(searchTerm))
+    if (loading) return <div className="main-content"><div className="empty-state"><Loader size={48} className="loading-spinner" /><h3>Carregando...</h3></div></div>;
+
+    const Modal = ({ children, onClose }) => (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()}>{children}</div>
+        </div>
     );
-
-    const formatCNPJ = (value) => {
-        const numbers = value.replace(/\D/g, '');
-        return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-    };
 
     return (
         <div className="main-content">
-            <div className="page-header">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="page-title">Distribuidoras</h1>
-                        <p className="page-subtitle">Gerencie suas distribuidoras de medicamentos</p>
-                    </div>
-                    <button className="btn btn-primary" onClick={() => openModal()}>
-                        <Plus size={18} />
-                        Nova Distribuidora
-                    </button>
+            <div className="page-header flex justify-between items-center">
+                <div>
+                    <h1 className="page-title">🏢 Distribuidoras</h1>
+                    <p className="page-subtitle">Gerencie suas distribuidoras cadastradas</p>
                 </div>
+                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={18} /> Nova Distribuidora
+                </button>
             </div>
 
-            <div className="card">
-                <div className="search-bar">
-                    <Search size={20} />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nome ou CNPJ..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-
-                {loading ? (
-                    <div className="empty-state loading">
-                        <Building2 size={64} />
-                        <h3>Carregando...</h3>
-                    </div>
-                ) : filteredDistributors.length === 0 ? (
-                    <div className="empty-state">
-                        <Building2 size={64} />
-                        <h3>Nenhuma distribuidora encontrada</h3>
-                        <p>{searchTerm ? 'Tente buscar por outro termo' : 'Comece adicionando sua primeira distribuidora'}</p>
-                        {!searchTerm && (
-                            <button className="btn btn-primary" onClick={() => openModal()}>
-                                <Plus size={18} />
-                                Adicionar Distribuidora
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>CNPJ</th>
-                                    <th>Contato</th>
-                                    <th>Observações</th>
-                                    <th style={{ width: '100px' }}>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredDistributors.map(distributor => (
-                                    <tr key={distributor.id}>
-                                        <td>
-                                            <div className="flex items-center gap-md">
-                                                <div className="stat-icon primary" style={{ width: 36, height: 36 }}>
-                                                    <Building2 size={18} />
-                                                </div>
-                                                <strong>{distributor.name}</strong>
-                                            </div>
-                                        </td>
-                                        <td>{distributor.cnpj || '-'}</td>
-                                        <td>
-                                            {distributor.contact ? (
-                                                <div className="flex items-center gap-sm">
-                                                    <Phone size={14} />
-                                                    {distributor.contact}
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                        <td>
-                                            {distributor.notes ? (
-                                                <div className="flex items-center gap-sm" style={{ maxWidth: 200 }}>
-                                                    <FileText size={14} />
-                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {distributor.notes}
-                                                    </span>
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-sm">
-                                                <button
-                                                    className="btn btn-ghost btn-icon"
-                                                    onClick={() => openModal(distributor)}
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    className="btn btn-ghost btn-icon"
-                                                    onClick={() => handleDelete(distributor.id)}
-                                                    title="Excluir"
-                                                    style={{ color: 'var(--error)' }}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">
-                                {editingDistributor ? 'Editar Distribuidora' : 'Nova Distribuidora'}
-                            </h2>
-                            <button className="modal-close" onClick={closeModal}>
-                                <X size={20} />
-                            </button>
+            {distributors.length === 0 ? (
+                <div className="card"><div className="empty-state"><Building2 size={64} /><h3>Nenhuma distribuidora</h3><p>Clique em "Nova Distribuidora" para adicionar</p></div></div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-lg)' }}>
+                    {distributors.map(dist => (
+                        <div key={dist.id} className="card">
+                            <div className="flex justify-between items-center mb-md">
+                                <h3 style={{ fontWeight: 600, fontSize: '1.1rem' }}>{dist.name}</h3>
+                                <div className="flex gap-xs">
+                                    <button className="btn btn-ghost" onClick={() => handleEdit(dist)}><Edit2 size={16} /></button>
+                                    <button className="btn btn-ghost" style={{ color: 'var(--accent-danger)' }} onClick={() => setShowDeleteModal(dist)}><Trash2 size={16} /></button>
+                                </div>
+                            </div>
+                            {dist.cnpj && <p className="text-muted" style={{ fontSize: '0.85rem' }}>CNPJ: {dist.cnpj}</p>}
+                            {dist.contact && <p className="text-muted" style={{ fontSize: '0.85rem' }}><Phone size={12} style={{ verticalAlign: 'middle' }} /> {dist.contact}</p>}
+                            <div style={{ marginTop: 'var(--space-md)' }}>
+                                <span className="badge badge-primary">{getDistPriceCount(dist.id)} preço(s)</span>
+                            </div>
                         </div>
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Nome *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Nome da distribuidora"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">CNPJ</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="00.000.000/0000-00"
-                                        value={formData.cnpj}
-                                        onChange={(e) => setFormData({ ...formData, cnpj: formatCNPJ(e.target.value) })}
-                                        maxLength={18}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Contato</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Telefone ou e-mail"
-                                        value={formData.contact}
-                                        onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Observações</label>
-                                    <textarea
-                                        className="form-textarea"
-                                        placeholder="Observações sobre a distribuidora..."
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                                    Cancelar
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    {editingDistributor ? 'Salvar Alterações' : 'Adicionar'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                    ))}
                 </div>
+            )}
+
+            {/* Modal: Nova/Editar */}
+            {showModal && (
+                <Modal onClose={closeModal}>
+                    <div className="modal-header">
+                        <h3 className="modal-title"><Building2 size={20} /> {editingId ? 'Editar' : 'Nova'} Distribuidora</h3>
+                        <button className="modal-close" onClick={closeModal}><X size={24} /></button>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Nome *</label>
+                        <input type="text" className="form-input" placeholder="Nome da distribuidora" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">CNPJ</label>
+                        <input type="text" className="form-input" placeholder="00.000.000/0000-00" value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Contato</label>
+                        <input type="text" className="form-input" placeholder="Telefone ou e-mail" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Observações</label>
+                        <input type="text" className="form-input" placeholder="Notas adicionais" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
+                        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving || !form.name.trim()}>{saving ? 'Salvando...' : 'Salvar'}</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Modal: Excluir */}
+            {showDeleteModal && (
+                <Modal onClose={() => setShowDeleteModal(null)}>
+                    <div className="modal-header">
+                        <h3 className="modal-title" style={{ color: 'var(--accent-danger)' }}><AlertTriangle size={20} /> Excluir Distribuidora</h3>
+                        <button className="modal-close" onClick={() => setShowDeleteModal(null)}><X size={24} /></button>
+                    </div>
+                    <p>Excluir <strong>"{showDeleteModal.name}"</strong> e todos os seus {getDistPriceCount(showDeleteModal.id)} preços?</p>
+                    <div className="modal-footer">
+                        <button className="btn btn-secondary" onClick={() => setShowDeleteModal(null)}>Cancelar</button>
+                        <button className="btn btn-danger" onClick={() => handleDelete(showDeleteModal)} disabled={saving}>{saving ? 'Excluindo...' : 'Excluir'}</button>
+                    </div>
+                </Modal>
             )}
         </div>
     );
