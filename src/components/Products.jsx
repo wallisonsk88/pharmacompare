@@ -16,6 +16,7 @@ export default function Products() {
     const [saving, setSaving] = useState(false);
 
     const [newProductName, setNewProductName] = useState('');
+    const [newProductEan, setNewProductEan] = useState('');
     const [newPriceValue, setNewPriceValue] = useState('');
     const [newPriceDistributor, setNewPriceDistributor] = useState('');
 
@@ -37,9 +38,16 @@ export default function Products() {
         if (!newProductName.trim()) return;
         setSaving(true);
         try {
-            await createProduct({ name: newProductName.trim(), ean: '', manufacturer: '', category: 'generico', unit: 'cx' });
+            await createProduct({
+                name: newProductName.trim(),
+                ean: newProductEan.trim(),
+                manufacturer: '',
+                category: 'generico',
+                unit: 'cx'
+            });
             await loadData();
             setNewProductName('');
+            setNewProductEan('');
             setShowAddModal(false);
         } catch (e) { console.error(e); alert('Erro ao criar produto'); }
         setSaving(false);
@@ -93,7 +101,10 @@ export default function Products() {
         setDeleting(false);
     };
 
-    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredProducts = products.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.ean && p.ean.includes(searchTerm))
+    );
     const getPriceCount = (productId) => prices.filter(p => p.product_id === productId).length;
     const getDistPriceCount = (distId) => prices.filter(p => p.distributor_id === distId).length;
 
@@ -156,11 +167,12 @@ export default function Products() {
                 <div className="card">
                     <div className="table-container">
                         <table className="table">
-                            <thead><tr><th>Produto</th><th>Preços</th><th style={{ width: 130 }}>Ações</th></tr></thead>
+                            <thead><tr><th>Produto</th><th>Cód. Barras</th><th>Preços</th><th style={{ width: 130 }}>Ações</th></tr></thead>
                             <tbody>
                                 {filteredProducts.slice(0, 50).map(product => (
                                     <tr key={product.id}>
                                         <td><strong>{product.name}</strong></td>
+                                        <td><code style={{ fontSize: '0.85rem' }}>{product.ean || '-'}</code></td>
                                         <td><span className="badge badge-primary">{getPriceCount(product.id)}</span></td>
                                         <td>
                                             <div className="flex gap-sm">
@@ -186,6 +198,10 @@ export default function Products() {
                     <div className="form-group">
                         <label className="form-label">Nome do Produto</label>
                         <input type="text" className="form-input" placeholder="Ex: Dipirona 500mg" value={newProductName} onChange={e => setNewProductName(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleAddProduct()} autoFocus />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Código de Barras (opcional)</label>
+                        <input type="text" className="form-input" placeholder="Ex: 7891234567890" value={newProductEan} onChange={e => setNewProductEan(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleAddProduct()} />
                     </div>
                     <div className="modal-footer">
                         <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancelar</button>

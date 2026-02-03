@@ -26,7 +26,8 @@ export default function History() {
 
     const filteredPrices = prices.filter(p => {
         const product = products.find(pr => pr.id === p.product_id);
-        return product?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const term = searchTerm.toLowerCase();
+        return product?.name.toLowerCase().includes(term) || (product?.ean && product.ean.includes(term));
     });
 
     if (loading) return <div className="main-content"><div className="empty-state"><Loader size={48} className="loading-spinner" /><h3>Carregando...</h3></div></div>;
@@ -54,6 +55,7 @@ export default function History() {
                             <thead>
                                 <tr>
                                     <th>Data</th>
+                                    <th>Cód. Barras</th>
                                     <th>Produto</th>
                                     <th>Distribuidora</th>
                                     <th style={{ textAlign: 'right' }}>Preço</th>
@@ -66,6 +68,7 @@ export default function History() {
                                     return (
                                         <tr key={price.id}>
                                             <td className="text-muted" style={{ fontSize: '0.85rem' }}>{formatDate(price.recorded_at)}</td>
+                                            <td><code style={{ fontSize: '0.85rem' }}>{product?.ean || '-'}</code></td>
                                             <td><strong>{product?.name || '-'}</strong></td>
                                             <td>{dist?.name || '-'}</td>
                                             <td style={{ textAlign: 'right' }}><span className="font-bold text-success">{formatCurrency(price.price)}</span></td>

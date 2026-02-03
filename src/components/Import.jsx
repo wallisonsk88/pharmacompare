@@ -89,11 +89,12 @@ export default function Import() {
 
             // Identificar colunas automaticamente
             const header = rows[0].map(h => String(h || '').toLowerCase());
-            let productCol = -1, priceCol = -1;
+            let productCol = -1, priceCol = -1, eanCol = -1;
 
             header.forEach((h, i) => {
                 if (h.includes('produto') || h.includes('medicamento') || h.includes('nome') || h.includes('descri')) productCol = i;
                 if (h.includes('preço') || h.includes('preco') || h.includes('valor') || h.includes('pmc') || h.includes('custo') || h.includes('unit')) priceCol = i;
+                if (h.includes('ean') || h.includes('barras') || h.includes('barcode') || h.includes('cod')) eanCol = i;
             });
 
             if (productCol === -1) productCol = 0;
@@ -109,6 +110,7 @@ export default function Import() {
 
                 try {
                     const productName = String(row[productCol] || '').trim();
+                    const eanVal = eanCol !== -1 ? String(row[eanCol] || '').trim() : '';
                     let priceStr = String(row[priceCol] || '');
                     priceStr = priceStr.replace(/[R$\s]/g, '').replace(',', '.').replace(/[^\d.]/g, '');
                     const priceVal = parseFloat(priceStr);
@@ -122,7 +124,7 @@ export default function Import() {
                     if (!product) {
                         product = await createProduct({
                             name: productName,
-                            ean: '',
+                            ean: eanVal,
                             manufacturer: '',
                             category: 'generico',
                             unit: 'cx'

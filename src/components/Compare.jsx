@@ -30,7 +30,8 @@ export default function Compare() {
 
     // Filtrar produtos pela busca
     const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.ean && p.ean.includes(searchTerm))
     );
 
     // Agrupar preços por produto - pegar apenas o mais recente de cada distribuidora
@@ -153,7 +154,12 @@ export default function Compare() {
                         return (
                             <div key={product.id} className="product-card">
                                 <div className="product-header">
-                                    <div className="product-name">{product.name}</div>
+                                    <div>
+                                        <div className="product-name">{product.name}</div>
+                                        {product.ean && (
+                                            <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>EAN: {product.ean}</div>
+                                        )}
+                                    </div>
                                     {saving > 0 && (
                                         <div className="saving-badge">
                                             <ArrowDownRight size={16} />

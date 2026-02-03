@@ -135,8 +135,9 @@ export default function Prices() {
     const filteredPrices = prices.filter(p => {
         const productName = p.products?.name?.toLowerCase() || '';
         const distributorName = p.distributors?.name?.toLowerCase() || '';
+        const ean = p.products?.ean || '';
         const term = searchTerm.toLowerCase();
-        return productName.includes(term) || distributorName.includes(term);
+        return productName.includes(term) || distributorName.includes(term) || ean.includes(term);
     });
 
     const formatPriceInput = (value) => {
@@ -240,7 +241,12 @@ export default function Prices() {
                                                 <div className="stat-icon accent" style={{ width: 32, height: 32 }}>
                                                     <Package size={16} />
                                                 </div>
-                                                {price.products?.name || 'N/A'}
+                                                <div>
+                                                    <div>{price.products?.name || 'N/A'}</div>
+                                                    {price.products?.ean && (
+                                                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>EAN: {price.products.ean}</div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td>
