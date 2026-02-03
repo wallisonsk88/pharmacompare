@@ -194,26 +194,41 @@ export default function Import() {
                     results.products++;
                 }
 
+                // Se não tem distribuidora mapeada, usa uma distribuidora padrão "Importação"
                 let distributor = null;
                 if (mapping.distributorName) {
                     const dName = String(row[parseInt(mapping.distributorName)] || '').trim();
                     if (dName) {
                         distributor = distributorsMap[dName.toLowerCase()];
                         if (!distributor) {
-                            distributor = await createDistributor({ name: dName, cnpj: '', contact: '', notes: 'Importado' });
+                            distributor = await createDistributor({ name: dName, cnpj: '', contact: '', notes: 'Importado automaticamente' });
                             distributorsMap[dName.toLowerCase()] = distributor;
                             results.distributors++;
                         }
                     }
                 }
 
-                if (distributor) {
-                    const minQ = mapping.minQuantity ? parseInt(row[parseInt(mapping.minQuantity)] || '1') : 1;
-                    await createPrice({ product_id: product.id, distributor_id: distributor.id, price: priceVal, min_quantity: minQ || 1, validity: null });
-                    results.prices++;
+                // Se não encontrou distribuidora, cria/usa uma padrão
+                if (!distributor) {
+                    const defaultDistName = 'Importação Geral';
+                    distributor = distributorsMap[defaultDistName.toLowerCase()];
+                    if (!distributor) {
+                        distributor = await createDistributor({ name: defaultDistName, cnpj: '', contact: '', notes: 'Distribuidora padrão para importações sem distribuidora definida' });
+                        distributorsMap[defaultDistName.toLowerCase()] = distributor;
+                        results.distributors++;
+                    }
                 }
+
+                // Sempre cria o preço
+                const minQ = mapping.minQuantity ? parseInt(row[parseInt(mapping.minQuantity)] || '1') : 1;
+                await createPrice({ product_id: product.id, distributor_id: distributor.id, price: priceVal, min_quantity: minQ || 1, validity: null });
+                results.prices++;
+
                 results.success++;
-            } catch { results.errors++; }
+            } catch (err) {
+                console.error('Erro ao importar linha:', err);
+                results.errors++;
+            }
         }
         setImportResult(results);
         setStep(3);
