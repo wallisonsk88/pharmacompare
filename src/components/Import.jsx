@@ -2,10 +2,11 @@ import React, { useState, useRef } from 'react';
 import { FileDown, Upload, FileSpreadsheet, FileText, X, Check, AlertTriangle, Loader, ArrowRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { getProducts, getDistributors, createProduct, createDistributor, createPrice } from '../config/supabase';
 
-// Configurar worker do PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configurar worker do PDF.js com import local
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function Import() {
     const [fileData, setFileData] = useState(null);
