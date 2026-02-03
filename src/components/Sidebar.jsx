@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitCompare, Upload, Package, TrendingUp, Building2, Settings, BarChart3 } from 'lucide-react';
+import { GitCompare, Upload, Package, TrendingUp, Building2, Settings, BarChart3, ShoppingCart } from 'lucide-react';
 
 export default function Sidebar({ currentPage, onNavigate }) {
     const menuItems = [
@@ -7,6 +7,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
         { id: 'import', label: 'Importar Tabela', icon: Upload },
         { id: 'products', label: 'Produtos', icon: Package },
         { id: 'history', label: 'Histórico', icon: TrendingUp },
+        { id: 'shopping-list', label: 'Lista de Compras', icon: ShoppingCart },
         { id: 'distributors', label: 'Distribuidoras', icon: Building2 },
     ];
 

@@ -6,6 +6,7 @@ import Import from './components/Import';
 import History from './components/History';
 import Distributors from './components/Distributors';
 import Products from './components/Products';
+import ShoppingList from './components/ShoppingList';
 import SettingsPage from './components/Settings';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
       case 'import': return <Import />;
       case 'products': return <Products />;
       case 'history': return <History />;
+      case 'shopping-list': return <ShoppingList />;
       case 'distributors': return <Distributors />;
       case 'settings': return <SettingsPage />;
       default: return <Compare />;
