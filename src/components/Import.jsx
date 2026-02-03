@@ -151,12 +151,14 @@ export default function Import() {
                 itemsToProcess.push({ productName, eanVal, priceVal });
             }
 
-            setProgress({ current: 0, total: itemsToProcess.length });
+            const totalItems = itemsToProcess.length;
+            setProgress({ current: 0, total: totalItems });
 
             // Processar em lotes de 100 para melhor performance
             const BATCH_SIZE = 100;
             const newProductsToCreate = [];
             const pricesToCreate = [];
+            let processedCount = 0;
 
             // Primeiro, identificar produtos novos
             for (const item of itemsToProcess) {
@@ -193,7 +195,7 @@ export default function Import() {
                         }
                     }
                 }
-                setProgress({ current: Math.min(i + BATCH_SIZE, newProductsToCreate.length), total: newProductsToCreate.length + itemsToProcess.length });
+                // Progresso: estamos na fase de criar produtos (0-50% do total)
             }
 
             // Preparar preços
@@ -231,7 +233,8 @@ export default function Import() {
                         }
                     }
                 }
-                setProgress({ current: newProductsToCreate.length + Math.min(i + BATCH_SIZE, pricesToCreate.length), total: newProductsToCreate.length + pricesToCreate.length });
+                processedCount = Math.min(i + BATCH_SIZE, pricesToCreate.length);
+                setProgress({ current: processedCount, total: totalItems });
             }
 
             setImportResult(results);
