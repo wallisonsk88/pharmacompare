@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileSpreadsheet, Check, Loader, Building2, AlertTriangle } from 'lucide-react';
+import { Upload, Check, Loader, Building2, Plus, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getDistributors, createDistributor, getProducts, createProduct, createPrice } from '../config/supabase';
 
@@ -7,7 +7,6 @@ export default function Import() {
     const [distributors, setDistributors] = useState([]);
     const [selectedDistributor, setSelectedDistributor] = useState('');
     const [newDistributorName, setNewDistributorName] = useState('');
-    const [showNewDistributor, setShowNewDistributor] = useState(false);
     const [loading, setLoading] = useState(true);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
@@ -26,12 +25,19 @@ export default function Import() {
     const handleCreateDistributor = async () => {
         if (!newDistributorName.trim()) return;
         try {
-            const newDist = await createDistributor({ name: newDistributorName.trim(), cnpj: '', contact: '', notes: '' });
+            const newDist = await createDistributor({
+                name: newDistributorName.trim(),
+                cnpj: '',
+                contact: '',
+                notes: ''
+            });
             setDistributors([...distributors, newDist]);
             setSelectedDistributor(newDist.id);
             setNewDistributorName('');
-            setShowNewDistributor(false);
-        } catch (e) { console.error(e); alert('Erro ao criar distribuidora'); }
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao criar distribuidora');
+        }
     };
 
     const handleFileUpload = async (e) => {
@@ -42,49 +48,38 @@ export default function Import() {
         setImportResult(null);
 
         try {
-            const ext = file.name.split('.').pop().toLowerCase();
-            let rows = [];
+            const data = new Uint8Array(await file.arrayBuffer());
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-            if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
-                const data = new Uint8Array(await file.arrayBuffer());
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-            } else {
-                alert('Use arquivos Excel (.xlsx) ou CSV');
-                setImporting(false);
-                return;
-            }
-
-            // Processar linhas - encontrar coluna de produto e preço
             if (rows.length < 2) {
                 alert('Arquivo vazio ou sem dados');
                 setImporting(false);
                 return;
             }
 
+            // Identificar colunas automaticamente
             const header = rows[0].map(h => String(h || '').toLowerCase());
             let productCol = -1, priceCol = -1;
 
-            // Tentar identificar colunas automaticamente
             header.forEach((h, i) => {
                 if (h.includes('produto') || h.includes('medicamento') || h.includes('nome') || h.includes('descri')) productCol = i;
-                if (h.includes('preço') || h.includes('preco') || h.includes('valor') || h.includes('pmc') || h.includes('custo')) priceCol = i;
+                if (h.includes('preço') || h.includes('preco') || h.includes('valor') || h.includes('pmc') || h.includes('custo') || h.includes('unit')) priceCol = i;
             });
 
-            // Se não encontrou, usar primeira e última coluna como padrão
+            // Fallback: primeira coluna = produto, última = preço
             if (productCol === -1) productCol = 0;
             if (priceCol === -1) priceCol = rows[0].length - 1;
 
-            const results = { success: 0, errors: 0, total: 0 };
+            const results = { success: 0, errors: 0, total: rows.length - 1 };
             const existingProducts = await getProducts();
             const productsMap = {};
             existingProducts.forEach(p => { productsMap[p.name.toLowerCase()] = p; });
 
-            // Importar cada linha (exceto cabeçalho)
+            // Importar linhas
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                results.total++;
 
                 try {
                     const productName = String(row[productCol] || '').trim();
@@ -100,7 +95,13 @@ export default function Import() {
                     // Criar ou buscar produto
                     let product = productsMap[productName.toLowerCase()];
                     if (!product) {
-                        product = await createProduct({ name: productName, ean: '', manufacturer: '', category: 'generico', unit: 'cx' });
+                        product = await createProduct({
+                            name: productName,
+                            ean: '',
+                            manufacturer: '',
+                            category: 'generico',
+                            unit: 'cx'
+                        });
                         productsMap[productName.toLowerCase()] = product;
                     }
 
@@ -123,7 +124,7 @@ export default function Import() {
             setImportResult(results);
         } catch (error) {
             console.error('Erro ao importar:', error);
-            alert('Erro ao processar arquivo');
+            alert('Erro ao processar arquivo: ' + error.message);
         }
 
         setImporting(false);
@@ -136,100 +137,116 @@ export default function Import() {
     };
 
     if (loading) {
-        return <div className="main-content"><div className="empty-state"><Loader size={48} className="loading" /><h3>Carregando...</h3></div></div>;
+        return (
+            <div className="main-content">
+                <div className="empty-state">
+                    <Loader size={48} className="loading" />
+                    <h3>Carregando...</h3>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="main-content">
             <div className="page-header">
-                <h1 className="page-title">Importar Tabela de Preços</h1>
-                <p className="page-subtitle">Selecione a distribuidora e importe a tabela</p>
+                <h1 className="page-title">📥 Importar Tabela de Preços</h1>
+                <p className="page-subtitle">Selecione a distribuidora e envie o arquivo Excel ou CSV</p>
             </div>
 
             {importResult ? (
-                <div className="card">
-                    <div className="empty-state">
-                        <div className="stat-icon accent" style={{ width: 80, height: 80 }}><Check size={40} /></div>
-                        <h3>Importação Concluída!</h3>
-                        <p>{importResult.success} de {importResult.total} produtos importados</p>
+                <div className="card text-center">
+                    <div style={{ padding: 'var(--spacing-xl)' }}>
+                        <div className="stat-icon green" style={{ width: 80, height: 80, margin: '0 auto var(--spacing-lg)', borderRadius: '50%' }}>
+                            <Check size={40} />
+                        </div>
+                        <h2 style={{ marginBottom: 'var(--spacing-sm)' }}>Importação Concluída!</h2>
+                        <p style={{ fontSize: '1.25rem', marginBottom: 'var(--spacing-lg)' }}>
+                            <span className="text-success font-bold">{importResult.success}</span> de {importResult.total} produtos importados
+                        </p>
                         {importResult.errors > 0 && (
-                            <p style={{ color: 'var(--warning)', marginTop: 8 }}>
-                                <AlertTriangle size={16} style={{ verticalAlign: 'middle' }} /> {importResult.errors} linhas ignoradas (sem nome ou preço válido)
+                            <p style={{ color: 'var(--warning)' }}>
+                                {importResult.errors} linhas ignoradas (sem nome ou preço válido)
                             </p>
                         )}
-                        <button className="btn btn-primary btn-lg mt-lg" onClick={reset}>Nova Importação</button>
+                        <button className="btn btn-primary" onClick={reset} style={{ marginTop: 'var(--spacing-lg)' }}>
+                            Nova Importação
+                        </button>
                     </div>
                 </div>
             ) : (
                 <>
-                    {/* Passo 1: Selecionar Distribuidora */}
+                    {/* Passo 1: Distribuidora */}
                     <div className="card mb-lg">
-                        <h3 className="card-title mb-md flex items-center gap-sm">
-                            <Building2 size={20} />
-                            1. Selecione a Distribuidora
-                        </h3>
+                        <div className="card-header">
+                            <h3 className="card-title flex items-center gap-sm">
+                                <Building2 size={20} />
+                                1. Selecione a Distribuidora
+                            </h3>
+                        </div>
 
-                        {!showNewDistributor ? (
-                            <div className="flex gap-md">
-                                <select
-                                    className="form-select"
-                                    value={selectedDistributor}
-                                    onChange={(e) => setSelectedDistributor(e.target.value)}
-                                    style={{ flex: 1 }}
-                                >
-                                    <option value="">Escolha uma distribuidora...</option>
-                                    {distributors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
-                                <button className="btn btn-secondary" onClick={() => setShowNewDistributor(true)}>
-                                    + Nova
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex gap-md">
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Nome da nova distribuidora"
-                                    value={newDistributorName}
-                                    onChange={(e) => setNewDistributorName(e.target.value)}
-                                    style={{ flex: 1 }}
-                                />
-                                <button className="btn btn-primary" onClick={handleCreateDistributor}>Criar</button>
-                                <button className="btn btn-secondary" onClick={() => { setShowNewDistributor(false); setNewDistributorName(''); }}>Cancelar</button>
-                            </div>
-                        )}
+                        <div className="flex gap-md" style={{ marginBottom: 'var(--spacing-md)' }}>
+                            <select
+                                className="form-select"
+                                value={selectedDistributor}
+                                onChange={(e) => setSelectedDistributor(e.target.value)}
+                                style={{ flex: 1 }}
+                            >
+                                <option value="">Escolha uma distribuidora...</option>
+                                {distributors.map(d => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex gap-sm items-center">
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Ou crie uma nova distribuidora..."
+                                value={newDistributorName}
+                                onChange={(e) => setNewDistributorName(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleCreateDistributor()}
+                                style={{ flex: 1 }}
+                            />
+                            <button
+                                className="btn btn-success"
+                                onClick={handleCreateDistributor}
+                                disabled={!newDistributorName.trim()}
+                            >
+                                <Plus size={18} /> Criar
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Passo 2: Importar Arquivo */}
+                    {/* Passo 2: Upload */}
                     <div className="card">
-                        <h3 className="card-title mb-md flex items-center gap-sm">
-                            <FileSpreadsheet size={20} />
-                            2. Importe o Arquivo
-                        </h3>
+                        <div className="card-header">
+                            <h3 className="card-title flex items-center gap-sm">
+                                <FileSpreadsheet size={20} />
+                                2. Envie o Arquivo
+                            </h3>
+                        </div>
 
                         {!selectedDistributor ? (
-                            <div className="empty-state" style={{ padding: 'var(--spacing-xl)', opacity: 0.5 }}>
+                            <div className="upload-zone" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
                                 <Upload size={48} />
-                                <p>Primeiro selecione uma distribuidora acima</p>
+                                <h3>Primeiro selecione uma distribuidora</h3>
                             </div>
                         ) : importing ? (
-                            <div className="empty-state" style={{ padding: 'var(--spacing-xl)' }}>
+                            <div className="upload-zone">
                                 <Loader size={48} className="loading" />
                                 <h3>Importando...</h3>
                                 <p>Processando arquivo, aguarde...</p>
                             </div>
                         ) : (
                             <div
-                                className="empty-state"
-                                style={{ padding: 'var(--spacing-xl)', cursor: 'pointer', border: '2px dashed var(--primary-500)', borderRadius: 'var(--radius-lg)' }}
+                                className="upload-zone"
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <Upload size={48} />
                                 <h3>Clique para selecionar arquivo</h3>
                                 <p>Excel (.xlsx) ou CSV</p>
-                                <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginTop: 8 }}>
-                                    O sistema vai identificar automaticamente as colunas de produto e preço
-                                </p>
                             </div>
                         )}
 
@@ -240,6 +257,11 @@ export default function Import() {
                             onChange={handleFileUpload}
                             style={{ display: 'none' }}
                         />
+
+                        <div style={{ marginTop: 'var(--spacing-lg)', padding: 'var(--spacing-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                            <strong>💡 Dica:</strong> O sistema identifica automaticamente as colunas de "Produto" e "Preço"
+                            pelo nome do cabeçalho. Se não encontrar, usa a primeira coluna como produto e a última como preço.
+                        </div>
                     </div>
                 </>
             )}

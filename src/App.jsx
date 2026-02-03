@@ -1,25 +1,23 @@
 import React, { useState } from 'react';
 import './index.css';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import Distributors from './components/Distributors';
 import Compare from './components/Compare';
 import Import from './components/Import';
 import History from './components/History';
+import Distributors from './components/Distributors';
 import SettingsPage from './components/Settings';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState('compare'); // Página inicial = Comparar Preços
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard': return <Dashboard onNavigate={setCurrentPage} />;
-      case 'distributors': return <Distributors />;
       case 'compare': return <Compare />;
       case 'import': return <Import />;
       case 'history': return <History />;
+      case 'distributors': return <Distributors />;
       case 'settings': return <SettingsPage />;
-      default: return <Dashboard onNavigate={setCurrentPage} />;
+      default: return <Compare />;
     }
   };
 

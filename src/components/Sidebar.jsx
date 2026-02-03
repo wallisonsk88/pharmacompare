@@ -3,9 +3,8 @@ import { LayoutDashboard, Upload, GitCompare, TrendingUp, Building2, Settings } 
 
 export default function Sidebar({ currentPage, onNavigate }) {
     const menuItems = [
-        { id: 'dashboard', label: 'Início', icon: LayoutDashboard },
-        { id: 'import', label: 'Importar Tabela', icon: Upload },
         { id: 'compare', label: 'Comparar Preços', icon: GitCompare },
+        { id: 'import', label: 'Importar Tabela', icon: Upload },
         { id: 'history', label: 'Histórico', icon: TrendingUp },
         { id: 'distributors', label: 'Distribuidoras', icon: Building2 },
     ];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, TrendingDown, TrendingUp, Package, Building2, DollarSign } from 'lucide-react';
+import { Search, TrendingDown, Package, Building2, ArrowRight } from 'lucide-react';
 import { getProducts, getPrices } from '../config/supabase';
 
 export default function Compare() {
@@ -26,9 +26,8 @@ export default function Compare() {
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Agrupar preços por produto
+    // Agrupar preços por produto - pegar apenas o mais recente de cada distribuidora
     const getProductPrices = (productId) => {
-        // Pegar o preço mais recente de cada distribuidora
         const productPrices = prices.filter(p => p.product_id === productId);
         const byDistributor = {};
 
@@ -42,42 +41,85 @@ export default function Compare() {
         return Object.values(byDistributor).sort((a, b) => a.price - b.price);
     };
 
+    // Calcular estatísticas
+    const stats = {
+        totalProducts: products.length,
+        productsWithPrices: products.filter(p => prices.some(pr => pr.product_id === p.id)).length,
+        totalSavings: 0
+    };
+
+    products.forEach(p => {
+        const pPrices = getProductPrices(p.id);
+        if (pPrices.length > 1) {
+            stats.totalSavings += pPrices[pPrices.length - 1].price - pPrices[0].price;
+        }
+    });
+
     if (loading) {
-        return <div className="main-content"><div className="empty-state"><Package size={48} /><h3>Carregando...</h3></div></div>;
+        return (
+            <div className="main-content">
+                <div className="empty-state">
+                    <Package size={48} className="loading" />
+                    <h3>Carregando...</h3>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="main-content">
-            <div className="page-header">
-                <h1 className="page-title">Comparar Preços</h1>
-                <p className="page-subtitle">Veja qual distribuidora tem o melhor preço</p>
-            </div>
-
-            {/* Busca */}
-            <div className="card mb-lg">
-                <div className="search-container">
-                    <Search size={20} className="search-icon" />
+            {/* Hero de Busca */}
+            <div className="search-hero">
+                <h2>🔍 Encontre o Melhor Preço</h2>
+                <p>Digite o nome do medicamento para comparar preços entre distribuidoras</p>
+                <div className="search-box">
                     <input
                         type="text"
-                        className="search-input"
+                        className="search-input-large"
                         placeholder="Buscar medicamento..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
                     />
                 </div>
             </div>
 
-            {/* Lista de Comparações */}
+            {/* Estatísticas */}
+            <div className="stats-row">
+                <div className="stat-card">
+                    <div className="stat-icon blue"><Package size={24} /></div>
+                    <div>
+                        <div className="stat-value">{stats.totalProducts}</div>
+                        <div className="stat-label">Medicamentos</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon orange"><Building2 size={24} /></div>
+                    <div>
+                        <div className="stat-value">{stats.productsWithPrices}</div>
+                        <div className="stat-label">Com Preços</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon green"><TrendingDown size={24} /></div>
+                    <div>
+                        <div className="stat-value">{formatCurrency(stats.totalSavings)}</div>
+                        <div className="stat-label">Economia Possível</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lista de Produtos */}
             {filteredProducts.length === 0 ? (
                 <div className="card">
                     <div className="empty-state">
-                        <Package size={48} />
+                        <Package size={64} />
                         <h3>Nenhum medicamento encontrado</h3>
                         <p>Importe tabelas de preços para começar a comparar</p>
                     </div>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                <div className="product-list">
                     {filteredProducts.map(product => {
                         const productPrices = getProductPrices(product.id);
                         const bestPrice = productPrices[0];
@@ -85,44 +127,32 @@ export default function Compare() {
                         const saving = productPrices.length > 1 ? worstPrice.price - bestPrice.price : 0;
 
                         return (
-                            <div key={product.id} className="card">
-                                <div className="flex items-center justify-between mb-md">
-                                    <h3 className="card-title" style={{ margin: 0 }}>{product.name}</h3>
+                            <div key={product.id} className="product-item">
+                                <div className="product-item-header">
+                                    <div className="product-name">{product.name}</div>
                                     {saving > 0 && (
-                                        <span className="badge badge-success">
-                                            <TrendingDown size={14} /> Economia de {formatCurrency(saving)}
-                                        </span>
+                                        <div className="saving-indicator">
+                                            <TrendingDown size={16} />
+                                            Economia de {formatCurrency(saving)}
+                                        </div>
                                     )}
                                 </div>
 
                                 {productPrices.length === 0 ? (
-                                    <p style={{ color: 'var(--text-tertiary)' }}>Sem preços cadastrados</p>
+                                    <p style={{ color: 'var(--text-muted)' }}>Sem preços cadastrados</p>
                                 ) : (
-                                    <div className="table-container">
-                                        <table className="table">
-                                            <thead>
-                                                <tr>
-                                                    <th><Building2 size={14} style={{ verticalAlign: 'middle' }} /> Distribuidora</th>
-                                                    <th><DollarSign size={14} style={{ verticalAlign: 'middle' }} /> Preço</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {productPrices.map((price, idx) => (
-                                                    <tr key={price.id}>
-                                                        <td>{price.distributors?.name || 'Distribuidora'}</td>
-                                                        <td className="price-highlight">{formatCurrency(price.price)}</td>
-                                                        <td>
-                                                            {idx === 0 ? (
-                                                                <span className="badge badge-success"><TrendingDown size={12} /> Melhor Preço</span>
-                                                            ) : idx === productPrices.length - 1 && productPrices.length > 1 ? (
-                                                                <span className="badge badge-error"><TrendingUp size={12} /> Mais Caro</span>
-                                                            ) : null}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                    <div className="product-prices">
+                                        {productPrices.map((price, idx) => (
+                                            <div key={price.id} className={`price-option ${idx === 0 ? 'best' : ''}`}>
+                                                <div className="distributor-name">
+                                                    {price.distributors?.name || 'Distribuidora'}
+                                                </div>
+                                                <div className="price-value">
+                                                    {formatCurrency(price.price)}
+                                                    {idx === 0 && <span className="best-badge">MELHOR</span>}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>
