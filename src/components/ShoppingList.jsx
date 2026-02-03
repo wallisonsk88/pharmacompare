@@ -65,12 +65,8 @@ export default function ShoppingList() {
 
     const addToList = (product) => {
         const bestPrice = findBestPrice(product.id);
-        if (!bestPrice) {
-            alert('Nenhum preço cadastrado para este produto.');
-            return;
-        }
-
         const existingItem = list.find(item => item.product_id === product.id);
+
         if (existingItem) {
             updateQuantity(product.id, existingItem.quantity + 1);
         } else {
@@ -78,9 +74,9 @@ export default function ShoppingList() {
                 product_id: product.id,
                 name: product.name,
                 ean: product.ean,
-                price: bestPrice.price,
-                distributor_id: bestPrice.distributor_id,
-                distributor_name: bestPrice.distributors?.name || 'N/A',
+                price: bestPrice ? bestPrice.price : 0,
+                distributor_id: bestPrice ? bestPrice.distributor_id : null,
+                distributor_name: bestPrice ? (bestPrice.distributors?.name || 'N/A') : 'S/ Preço',
                 quantity: 1
             };
             setList([...list, newItem]);
@@ -224,7 +220,9 @@ export default function ShoppingList() {
                                                     {item.distributor_name}
                                                 </div>
                                             </td>
-                                            <td style={{ textAlign: 'center' }}>{formatCurrency(item.price)}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {item.price > 0 ? formatCurrency(item.price) : <span className="text-muted">N/A</span>}
+                                            </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div className="flex items-center justify-center gap-sm">
                                                     <button className="btn btn-ghost p-xs" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
@@ -236,8 +234,8 @@ export default function ShoppingList() {
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-success)' }}>
-                                                {formatCurrency(item.price * item.quantity)}
+                                            <td style={{ textAlign: 'right', fontWeight: 700, color: item.price > 0 ? 'var(--accent-success)' : 'var(--text-muted)' }}>
+                                                {item.price > 0 ? formatCurrency(item.price * item.quantity) : '-'}
                                             </td>
                                             <td>
                                                 <button
