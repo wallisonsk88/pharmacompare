@@ -5,15 +5,17 @@ import Compare from './components/Compare';
 import Import from './components/Import';
 import History from './components/History';
 import Distributors from './components/Distributors';
+import Products from './components/Products';
 import SettingsPage from './components/Settings';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('compare'); // Página inicial = Comparar Preços
+  const [currentPage, setCurrentPage] = useState('compare');
 
   const renderPage = () => {
     switch (currentPage) {
       case 'compare': return <Compare />;
       case 'import': return <Import />;
+      case 'products': return <Products />;
       case 'history': return <History />;
       case 'distributors': return <Distributors />;
       case 'settings': return <SettingsPage />;

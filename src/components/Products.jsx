@@ -1,331 +1,220 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Pill,
-    Plus,
-    Search,
-    Edit2,
-    Trash2,
-    X,
-    Barcode,
-    Factory,
-    Tag
-} from 'lucide-react';
-import { getProducts, createProduct, updateProduct, deleteProduct } from '../config/supabase';
-
-const categories = [
-    { value: 'referencia', label: 'Referência' },
-    { value: 'generico', label: 'Genérico' },
-    { value: 'similar', label: 'Similar' },
-    { value: 'fitoterapico', label: 'Fitoterápico' },
-    { value: 'outros', label: 'Outros' }
-];
-
-const units = [
-    { value: 'cx', label: 'Caixa' },
-    { value: 'un', label: 'Unidade' },
-    { value: 'fr', label: 'Frasco' },
-    { value: 'amp', label: 'Ampola' },
-    { value: 'env', label: 'Envelope' },
-    { value: 'tb', label: 'Tubo' }
-];
+import { Package, Trash2, Search, AlertTriangle, Loader, X } from 'lucide-react';
+import { getProducts, getPrices, deleteProduct, deletePrice } from '../config/supabase';
 
 export default function Products() {
     const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [prices, setPrices] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [showModal, setShowModal] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        ean: '',
-        manufacturer: '',
-        category: 'generico',
-        unit: 'cx'
-    });
+    const [loading, setLoading] = useState(true);
+    const [showDeleteModal, setShowDeleteModal] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
-    useEffect(() => {
-        loadProducts();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
-    const loadProducts = async () => {
+    const loadData = async () => {
         try {
-            const data = await getProducts();
-            setProducts(data);
-        } catch (error) {
-            console.error('Erro ao carregar produtos:', error);
-        } finally {
-            setLoading(false);
-        }
+            const [prods, allPrices] = await Promise.all([getProducts(), getPrices()]);
+            setProducts(prods);
+            setPrices(allPrices);
+        } catch (e) { console.error(e); }
+        setLoading(false);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleDeleteProduct = async (product) => {
+        setDeleting(true);
         try {
-            if (editingProduct) {
-                await updateProduct(editingProduct.id, formData);
-            } else {
-                await createProduct(formData);
+            // Deletar todos os preços deste produto primeiro
+            const productPrices = prices.filter(p => p.product_id === product.id);
+            for (const price of productPrices) {
+                await deletePrice(price.id);
             }
-            await loadProducts();
-            closeModal();
-        } catch (error) {
-            console.error('Erro ao salvar produto:', error);
-            alert('Erro ao salvar produto');
+            // Depois deletar o produto
+            await deleteProduct(product.id);
+            await loadData();
+            setShowDeleteModal(null);
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao excluir produto');
         }
+        setDeleting(false);
     };
 
-    const handleDelete = async (id) => {
-        if (confirm('Tem certeza que deseja excluir este medicamento?')) {
-            try {
-                await deleteProduct(id);
-                await loadProducts();
-            } catch (error) {
-                console.error('Erro ao excluir produto:', error);
-                alert('Erro ao excluir produto');
+    const handleDeleteAllPricesFromDistributor = async (distributorId, distributorName) => {
+        if (!confirm(`Tem certeza que deseja excluir TODOS os preços da distribuidora "${distributorName}"?`)) return;
+
+        setDeleting(true);
+        try {
+            const distPrices = prices.filter(p => p.distributor_id === distributorId);
+            for (const price of distPrices) {
+                await deletePrice(price.id);
             }
+            await loadData();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao excluir preços');
         }
-    };
-
-    const openModal = (product = null) => {
-        if (product) {
-            setEditingProduct(product);
-            setFormData({
-                name: product.name,
-                ean: product.ean || '',
-                manufacturer: product.manufacturer || '',
-                category: product.category || 'generico',
-                unit: product.unit || 'cx'
-            });
-        } else {
-            setEditingProduct(null);
-            setFormData({ name: '', ean: '', manufacturer: '', category: 'generico', unit: 'cx' });
-        }
-        setShowModal(true);
-    };
-
-    const closeModal = () => {
-        setShowModal(false);
-        setEditingProduct(null);
-        setFormData({ name: '', ean: '', manufacturer: '', category: 'generico', unit: 'cx' });
+        setDeleting(false);
     };
 
     const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.ean && p.ean.includes(searchTerm)) ||
-        (p.manufacturer && p.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()))
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const getCategoryBadge = (category) => {
-        const colors = {
-            referencia: 'primary',
-            generico: 'success',
-            similar: 'info',
-            fitoterapico: 'warning',
-            outros: 'secondary'
-        };
-        const labels = {
-            referencia: 'Referência',
-            generico: 'Genérico',
-            similar: 'Similar',
-            fitoterapico: 'Fitoterápico',
-            outros: 'Outros'
-        };
-        return <span className={`badge badge-${colors[category] || 'primary'}`}>{labels[category] || category}</span>;
-    };
+    const getPriceCount = (productId) => prices.filter(p => p.product_id === productId).length;
+
+    if (loading) {
+        return (
+            <div className="main-content">
+                <div className="empty-state">
+                    <Loader size={48} className="loading" />
+                    <h3>Carregando...</h3>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="main-content">
             <div className="page-header">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="page-title">Medicamentos</h1>
-                        <p className="page-subtitle">Catálogo de medicamentos para comparação</p>
-                    </div>
-                    <button className="btn btn-primary" onClick={() => openModal()}>
-                        <Plus size={18} />
-                        Novo Medicamento
-                    </button>
-                </div>
+                <h1 className="page-title">📦 Gerenciar Produtos</h1>
+                <p className="page-subtitle">Visualize e exclua produtos importados</p>
             </div>
 
-            <div className="card">
-                <div className="search-bar">
-                    <Search size={20} />
+            {/* Busca */}
+            <div className="card mb-lg">
+                <div className="flex gap-md items-center">
+                    <Search size={20} style={{ color: 'var(--text-muted)' }} />
                     <input
                         type="text"
-                        placeholder="Buscar por nome, código EAN ou fabricante..."
+                        className="form-input"
+                        placeholder="Buscar produto..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ flex: 1 }}
                     />
                 </div>
-
-                {loading ? (
-                    <div className="empty-state loading">
-                        <Pill size={64} />
-                        <h3>Carregando...</h3>
-                    </div>
-                ) : filteredProducts.length === 0 ? (
-                    <div className="empty-state">
-                        <Pill size={64} />
-                        <h3>Nenhum medicamento encontrado</h3>
-                        <p>{searchTerm ? 'Tente buscar por outro termo' : 'Comece adicionando seu primeiro medicamento'}</p>
-                        {!searchTerm && (
-                            <button className="btn btn-primary" onClick={() => openModal()}>
-                                <Plus size={18} />
-                                Adicionar Medicamento
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>Medicamento</th>
-                                    <th>EAN</th>
-                                    <th>Fabricante</th>
-                                    <th>Categoria</th>
-                                    <th>Unidade</th>
-                                    <th style={{ width: '100px' }}>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredProducts.map(product => (
-                                    <tr key={product.id}>
-                                        <td>
-                                            <div className="flex items-center gap-md">
-                                                <div className="stat-icon accent" style={{ width: 36, height: 36 }}>
-                                                    <Pill size={18} />
-                                                </div>
-                                                <strong>{product.name}</strong>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {product.ean ? (
-                                                <div className="flex items-center gap-sm">
-                                                    <Barcode size={14} />
-                                                    {product.ean}
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                        <td>
-                                            {product.manufacturer ? (
-                                                <div className="flex items-center gap-sm">
-                                                    <Factory size={14} />
-                                                    {product.manufacturer}
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                        <td>{getCategoryBadge(product.category)}</td>
-                                        <td>{units.find(u => u.value === product.unit)?.label || product.unit}</td>
-                                        <td>
-                                            <div className="flex gap-sm">
-                                                <button
-                                                    className="btn btn-ghost btn-icon"
-                                                    onClick={() => openModal(product)}
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    className="btn btn-ghost btn-icon"
-                                                    onClick={() => handleDelete(product.id)}
-                                                    title="Excluir"
-                                                    style={{ color: 'var(--error)' }}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
             </div>
 
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">
-                                {editingProduct ? 'Editar Medicamento' : 'Novo Medicamento'}
-                            </h2>
-                            <button className="modal-close" onClick={closeModal}>
-                                <X size={20} />
+            {/* Estatísticas */}
+            <div className="stats-row">
+                <div className="stat-card">
+                    <div className="stat-icon blue"><Package size={24} /></div>
+                    <div>
+                        <div className="stat-value">{products.length}</div>
+                        <div className="stat-label">Produtos</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon orange"><Package size={24} /></div>
+                    <div>
+                        <div className="stat-value">{prices.length}</div>
+                        <div className="stat-label">Preços Registrados</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lista de Produtos */}
+            {filteredProducts.length === 0 ? (
+                <div className="card">
+                    <div className="empty-state">
+                        <Package size={64} />
+                        <h3>Nenhum produto encontrado</h3>
+                        <p>Importe tabelas de preços para ver os produtos aqui</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="card">
+                    <table className="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Preços Cadastrados</th>
+                                <th style={{ width: 100 }}>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredProducts.map(product => (
+                                <tr key={product.id}>
+                                    <td>
+                                        <strong>{product.name}</strong>
+                                        {product.manufacturer && (
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                                                {product.manufacturer}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td>{getPriceCount(product.id)} preço(s)</td>
+                                    <td>
+                                        <button
+                                            className="btn btn-secondary"
+                                            style={{ padding: '8px', color: 'var(--danger)' }}
+                                            onClick={() => setShowDeleteModal(product)}
+                                            title="Excluir produto"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Modal de Confirmação */}
+            {showDeleteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div className="card" style={{ maxWidth: 400, width: '90%' }}>
+                        <div className="flex justify-between items-center mb-lg">
+                            <h3 style={{ margin: 0, color: 'var(--danger)' }}>
+                                <AlertTriangle size={20} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                                Excluir Produto
+                            </h3>
+                            <button
+                                onClick={() => setShowDeleteModal(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                            >
+                                <X size={24} />
                             </button>
                         </div>
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Nome do Medicamento *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Ex: Dipirona 500mg"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Código EAN (Código de Barras)</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="7891234567890"
-                                        value={formData.ean}
-                                        onChange={(e) => setFormData({ ...formData, ean: e.target.value.replace(/\D/g, '') })}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Fabricante/Laboratório</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Nome do laboratório"
-                                        value={formData.manufacturer}
-                                        onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
-                                    />
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
-                                    <div className="form-group">
-                                        <label className="form-label">Categoria</label>
-                                        <select
-                                            className="form-select"
-                                            value={formData.category}
-                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                        >
-                                            {categories.map(cat => (
-                                                <option key={cat.value} value={cat.value}>{cat.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Unidade</label>
-                                        <select
-                                            className="form-select"
-                                            value={formData.unit}
-                                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                                        >
-                                            {units.map(unit => (
-                                                <option key={unit.value} value={unit.value}>{unit.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                                    Cancelar
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    {editingProduct ? 'Salvar Alterações' : 'Adicionar'}
-                                </button>
-                            </div>
-                        </form>
+
+                        <p style={{ marginBottom: 'var(--spacing-lg)' }}>
+                            Tem certeza que deseja excluir <strong>"{showDeleteModal.name}"</strong>?
+                        </p>
+                        <p style={{ marginBottom: 'var(--spacing-lg)', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                            Isso também excluirá todos os {getPriceCount(showDeleteModal.id)} preços associados a este produto.
+                        </p>
+
+                        <div className="flex gap-md justify-between">
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setShowDeleteModal(null)}
+                                style={{ flex: 1 }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn"
+                                style={{ flex: 1, background: 'var(--danger)', color: 'white' }}
+                                onClick={() => handleDeleteProduct(showDeleteModal)}
+                                disabled={deleting}
+                            >
+                                {deleting ? <Loader size={18} className="loading" /> : <Trash2 size={18} />}
+                                {deleting ? 'Excluindo...' : 'Excluir'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

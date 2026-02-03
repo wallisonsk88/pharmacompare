@@ -1,10 +1,11 @@
 import React from 'react';
-import { LayoutDashboard, Upload, GitCompare, TrendingUp, Building2, Settings } from 'lucide-react';
+import { LayoutDashboard, Upload, GitCompare, TrendingUp, Building2, Settings, Package } from 'lucide-react';
 
 export default function Sidebar({ currentPage, onNavigate }) {
     const menuItems = [
         { id: 'compare', label: 'Comparar Preços', icon: GitCompare },
         { id: 'import', label: 'Importar Tabela', icon: Upload },
+        { id: 'products', label: 'Produtos', icon: Package },
         { id: 'history', label: 'Histórico', icon: TrendingUp },
         { id: 'distributors', label: 'Distribuidoras', icon: Building2 },
     ];
