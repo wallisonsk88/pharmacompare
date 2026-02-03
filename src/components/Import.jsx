@@ -176,6 +176,7 @@ export default function Import() {
             }
 
             // Criar produtos novos em lotes
+            const totalNewProducts = newProductsToCreate.length;
             for (let i = 0; i < newProductsToCreate.length; i += BATCH_SIZE) {
                 const batch = newProductsToCreate.slice(i, i + BATCH_SIZE);
                 try {
@@ -195,7 +196,9 @@ export default function Import() {
                         }
                     }
                 }
-                // Progresso: estamos na fase de criar produtos (0-50% do total)
+                // Progresso durante criação de produtos (primeira metade)
+                const productProgress = Math.min(i + BATCH_SIZE, totalNewProducts);
+                setProgress({ current: productProgress, total: totalItems, phase: 'Cadastrando produtos...' });
             }
 
             // Preparar preços
@@ -234,7 +237,7 @@ export default function Import() {
                     }
                 }
                 processedCount = Math.min(i + BATCH_SIZE, pricesToCreate.length);
-                setProgress({ current: processedCount, total: totalItems });
+                setProgress({ current: processedCount, total: totalItems, phase: 'Registrando preços...' });
             }
 
             setImportResult(results);
@@ -356,13 +359,14 @@ export default function Import() {
                                 <h3>Importando...</h3>
                                 {progress.total > 0 && (
                                     <>
-                                        <p>{progress.current} de {progress.total} itens processados</p>
+                                        <p style={{ fontWeight: 500 }}>{progress.phase || 'Preparando...'}</p>
+                                        <p>{progress.current} de {progress.total} itens</p>
                                         <div style={{ width: '100%', maxWidth: 300, height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden', margin: '1rem auto' }}>
                                             <div style={{ width: `${(progress.current / progress.total) * 100}%`, height: '100%', background: 'var(--accent-primary)', transition: 'width 0.3s ease' }} />
                                         </div>
                                     </>
                                 )}
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Processando arquivo, aguarde...</p>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Aguarde...</p>
                             </div>
                         ) : (
                             <div
