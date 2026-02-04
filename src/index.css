@@ -112,19 +112,20 @@ body {
 /* ========== SIDEBAR ========== */
 .sidebar {
   width: 260px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-primary);
+  background: #D2352E;
+  border-right: none;
   display: flex;
   flex-direction: column;
   position: fixed;
   height: 100vh;
   z-index: 100;
   flex-shrink: 0;
+  box-shadow: var(--shadow-lg);
 }
 
 .sidebar-header {
   padding: var(--space-lg);
-  border-bottom: 1px solid var(--border-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .logo {
@@ -136,22 +137,19 @@ body {
 .logo-icon {
   width: 42px;
   height: 42px;
-  background: var(--gradient-primary);
+  background: #ffffff;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-md);
 }
 
 .logo-text {
   font-size: 1.25rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #f0f2f5 0%, #a0a6b5 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #ffffff;
 }
 
 .sidebar-nav {
@@ -172,7 +170,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.6);
   padding: var(--space-sm) var(--space-md);
 }
 
@@ -182,7 +180,7 @@ body {
   gap: var(--space-md);
   padding: var(--space-md) var(--space-md);
   border-radius: var(--radius-md);
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -195,22 +193,22 @@ body {
 }
 
 .nav-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
 .nav-item.active {
-  background: var(--accent-primary-light);
-  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 .nav-item.active svg {
-  color: var(--accent-primary);
+  color: #ffffff;
 }
 
 .sidebar-footer {
   padding: var(--space-md);
-  border-top: 1px solid var(--border-primary);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* ========== ÁREA PRINCIPAL ========== */
