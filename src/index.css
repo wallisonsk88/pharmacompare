@@ -537,6 +537,24 @@ body {
   text-transform: uppercase;
 }
 
+/* Botões de ação nos preços */
+.price-card {
+  position: relative;
+}
+
+.price-card .price-actions {
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+
+.price-card:hover .price-actions {
+  opacity: 1;
+}
+
+.price-card:hover {
+  transform: scale(1.02);
+}
+
 /* ========== BADGES ========== */
 .badge {
   display: inline-flex;

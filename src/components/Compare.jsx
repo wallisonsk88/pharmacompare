@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, TrendingDown, TrendingUp, Package, Building2, ArrowDownRight, Zap } from 'lucide-react';
-import { getProducts, getPrices, getDistributors } from '../config/supabase';
+import { Search, TrendingDown, Package, Building2, ArrowDownRight, Zap, Plus, Edit2, X, Check, Trash2 } from 'lucide-react';
+import { getProducts, getPrices, getDistributors, createPrice, updatePrice, deletePrice } from '../config/supabase';
 
 export default function Compare() {
     const [products, setProducts] = useState([]);
@@ -8,6 +8,14 @@ export default function Compare() {
     const [distributors, setDistributors] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // Estados para edição de preços
+    const [editingPrice, setEditingPrice] = useState(null);
+    const [editValue, setEditValue] = useState('');
+    const [addingPriceProduct, setAddingPriceProduct] = useState(null);
+    const [newPriceDistributor, setNewPriceDistributor] = useState('');
+    const [newPriceValue, setNewPriceValue] = useState('');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => { loadData(); }, []);
 
@@ -47,6 +55,75 @@ export default function Compare() {
         });
 
         return Object.values(byDistributor).sort((a, b) => a.price - b.price);
+    };
+
+    // Distribuidoras que ainda não têm preço para o produto
+    const getAvailableDistributors = (productId) => {
+        const productPrices = getProductPrices(productId);
+        const usedDistIds = productPrices.map(p => p.distributor_id);
+        return distributors.filter(d => !usedDistIds.includes(d.id));
+    };
+
+    // Handlers de edição
+    const handleStartEdit = (price) => {
+        setEditingPrice(price.id);
+        setEditValue(price.price.toString().replace('.', ','));
+    };
+
+    const handleSaveEdit = async (price) => {
+        const newValue = parseFloat(editValue.replace(',', '.'));
+        if (isNaN(newValue) || newValue <= 0) {
+            alert('Valor inválido');
+            return;
+        }
+        setSaving(true);
+        try {
+            await updatePrice(price.id, { price: newValue });
+            await loadData();
+            setEditingPrice(null);
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao atualizar preço');
+        }
+        setSaving(false);
+    };
+
+    const handleDeletePrice = async (priceId) => {
+        if (!confirm('Excluir este preço?')) return;
+        try {
+            await deletePrice(priceId);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao excluir');
+        }
+    };
+
+    const handleAddPrice = async (productId) => {
+        if (!newPriceDistributor || !newPriceValue) return;
+        const priceVal = parseFloat(newPriceValue.replace(',', '.'));
+        if (isNaN(priceVal) || priceVal <= 0) {
+            alert('Valor inválido');
+            return;
+        }
+        setSaving(true);
+        try {
+            await createPrice({
+                product_id: productId,
+                distributor_id: newPriceDistributor,
+                price: priceVal,
+                min_quantity: 1,
+                validity: null
+            });
+            await loadData();
+            setAddingPriceProduct(null);
+            setNewPriceDistributor('');
+            setNewPriceValue('');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao adicionar preço');
+        }
+        setSaving(false);
     };
 
     // Calcular estatísticas
@@ -145,11 +222,12 @@ export default function Compare() {
                 </div>
             ) : (
                 <div className="product-list">
-                    {filteredProducts.map(product => {
+                    {filteredProducts.slice(0, 50).map(product => {
                         const productPrices = getProductPrices(product.id);
                         const bestPrice = productPrices[0];
                         const worstPrice = productPrices[productPrices.length - 1];
                         const saving = productPrices.length > 1 ? worstPrice.price - bestPrice.price : 0;
+                        const availableDistributors = getAvailableDistributors(product.id);
 
                         return (
                             <div key={product.id} className="product-card">
@@ -160,13 +238,79 @@ export default function Compare() {
                                             <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>EAN: {product.ean}</div>
                                         )}
                                     </div>
-                                    {saving > 0 && (
-                                        <div className="saving-badge">
-                                            <ArrowDownRight size={16} />
-                                            Economia de {formatCurrency(saving)}
-                                        </div>
-                                    )}
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        {saving > 0 && (
+                                            <div className="saving-badge">
+                                                <ArrowDownRight size={16} />
+                                                Economia de {formatCurrency(saving)}
+                                            </div>
+                                        )}
+                                        {availableDistributors.length > 0 && (
+                                            <button
+                                                className="btn btn-ghost"
+                                                onClick={() => setAddingPriceProduct(addingPriceProduct === product.id ? null : product.id)}
+                                                title="Adicionar preço de outra distribuidora"
+                                                style={{ padding: '4px 8px' }}
+                                            >
+                                                <Plus size={18} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
+
+                                {/* Formulário de adicionar preço */}
+                                {addingPriceProduct === product.id && (
+                                    <div style={{
+                                        padding: 'var(--space-md)',
+                                        background: 'var(--bg-tertiary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        marginBottom: 'var(--space-md)',
+                                        display: 'flex',
+                                        gap: 'var(--space-md)',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap'
+                                    }}>
+                                        <select
+                                            className="form-select"
+                                            value={newPriceDistributor}
+                                            onChange={(e) => setNewPriceDistributor(e.target.value)}
+                                            style={{ minWidth: 200 }}
+                                        >
+                                            <option value="">Selecione a distribuidora...</option>
+                                            {availableDistributors.map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))}
+                                        </select>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>R$</span>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="0,00"
+                                                value={newPriceValue}
+                                                onChange={(e) => setNewPriceValue(e.target.value)}
+                                                style={{ width: 100 }}
+                                            />
+                                        </div>
+                                        <button
+                                            className="btn btn-success"
+                                            onClick={() => handleAddPrice(product.id)}
+                                            disabled={saving || !newPriceDistributor || !newPriceValue}
+                                        >
+                                            <Check size={16} /> Adicionar
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost"
+                                            onClick={() => {
+                                                setAddingPriceProduct(null);
+                                                setNewPriceDistributor('');
+                                                setNewPriceValue('');
+                                            }}
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                )}
 
                                 {productPrices.length === 0 ? (
                                     <div style={{ padding: 'var(--space-lg)', color: 'var(--text-muted)' }}>
@@ -175,14 +319,91 @@ export default function Compare() {
                                 ) : (
                                     <div className="product-prices">
                                         {productPrices.map((price, idx) => (
-                                            <div key={price.id} className={`price-card ${idx === 0 ? 'best' : ''}`}>
+                                            <div
+                                                key={price.id}
+                                                className={`price-card ${idx === 0 ? 'best' : ''}`}
+                                                style={{
+                                                    position: 'relative',
+                                                    border: idx === 0 ? '2px solid var(--accent-success)' : undefined,
+                                                    background: idx === 0 ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)' : undefined
+                                                }}
+                                            >
                                                 <div className="distributor">
                                                     {price.distributors?.name || 'Distribuidora'}
                                                 </div>
                                                 <div className="price-value">
-                                                    {formatCurrency(price.price)}
-                                                    {idx === 0 && <span className="best-label">Melhor</span>}
+                                                    {editingPrice === price.id ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span>R$</span>
+                                                            <input
+                                                                type="text"
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                style={{
+                                                                    width: 80,
+                                                                    padding: '4px 8px',
+                                                                    border: '1px solid var(--border-primary)',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '1rem'
+                                                                }}
+                                                                autoFocus
+                                                                onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(price)}
+                                                            />
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                onClick={() => handleSaveEdit(price)}
+                                                                disabled={saving}
+                                                                style={{ padding: '4px' }}
+                                                            >
+                                                                <Check size={16} color="var(--accent-success)" />
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                onClick={() => setEditingPrice(null)}
+                                                                style={{ padding: '4px' }}
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ cursor: 'pointer' }} onClick={() => handleStartEdit(price)}>
+                                                                {formatCurrency(price.price)}
+                                                            </span>
+                                                            {idx === 0 && <span className="best-label">Melhor</span>}
+                                                        </>
+                                                    )}
                                                 </div>
+                                                {/* Botões de ação */}
+                                                {editingPrice !== price.id && (
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '4px',
+                                                        right: '4px',
+                                                        display: 'flex',
+                                                        gap: '2px',
+                                                        opacity: 0.6
+                                                    }}
+                                                        className="price-actions"
+                                                    >
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            onClick={() => handleStartEdit(price)}
+                                                            style={{ padding: '2px' }}
+                                                            title="Editar preço"
+                                                        >
+                                                            <Edit2 size={14} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            onClick={() => handleDeletePrice(price.id)}
+                                                            style={{ padding: '2px', color: 'var(--accent-danger)' }}
+                                                            title="Excluir preço"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
