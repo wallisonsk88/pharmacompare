@@ -15,8 +15,8 @@ export default function Sidebar({ currentPage, onNavigate, isOpen }) {
         <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
             <div className="sidebar-header">
                 <div className="logo">
-                    <img src="/favicon.png" alt="MegaFarma" className="logo-icon" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-                    <span className="logo-text">MegaFarma</span>
+                    <img src="/favicon.png" alt="FarmaPlano" className="logo-icon" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+                    <span className="logo-text">FarmaPlano</span>
                 </div>
             </div>
 
