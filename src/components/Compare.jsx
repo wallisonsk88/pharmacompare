@@ -154,270 +154,265 @@ export default function Compare() {
     }
 
     return (
-        <div className="main-content" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-            {/* Cabeçalho Fixo */}
-            <div className="compare-header" style={{ flexShrink: 0 }}>
-                {/* Hero de Busca */}
-                <div className="search-hero">
-                    <h1>🔍 Comparar Preços</h1>
-                    <p>Encontre o melhor preço entre todas as distribuidoras em tempo real</p>
-                    <div className="search-box">
-                        <div className="search-input-wrapper">
-                            <Search size={20} />
-                            <input
-                                type="text"
-                                className="search-input-large"
-                                placeholder="Digite o nome do medicamento..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                autoFocus
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Estatísticas */}
-                <div className="stats-grid">
-                    <div className="stat-card">
-                        <div className="stat-icon primary"><Package size={24} /></div>
-                        <div className="stat-content">
-                            <div className="stat-value">{stats.totalProducts}</div>
-                            <div className="stat-label">Produtos Cadastrados</div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon info"><Building2 size={24} /></div>
-                        <div className="stat-content">
-                            <div className="stat-value">{stats.totalDistributors}</div>
-                            <div className="stat-label">Distribuidoras</div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon warning"><Zap size={24} /></div>
-                        <div className="stat-content">
-                            <div className="stat-value">{stats.productsWithPrices}</div>
-                            <div className="stat-label">Com Preços Ativos</div>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon success"><TrendingDown size={24} /></div>
-                        <div className="stat-content">
-                            <div className="stat-value">{formatCurrency(stats.totalSavings)}</div>
-                            <div className="stat-label">Economia Potencial</div>
-                        </div>
+        <div className="main-content">
+            {/* Hero de Busca */}
+            <div className="search-hero">
+                <h1>🔍 Comparar Preços</h1>
+                <p>Encontre o melhor preço entre todas as distribuidoras em tempo real</p>
+                <div className="search-box">
+                    <div className="search-input-wrapper">
+                        <Search size={20} />
+                        <input
+                            type="text"
+                            className="search-input-large"
+                            placeholder="Digite o nome do medicamento..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            autoFocus
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* Lista de Produtos com Scroll */}
-            <div className="compare-products-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 'var(--space-lg)' }}>
-                {filteredProducts.length === 0 ? (
-                    <div className="card">
-                        <div className="empty-state">
-                            <Package size={64} />
-                            <h3>Nenhum produto encontrado</h3>
-                            <p style={{ marginTop: '8px' }}>
-                                {products.length === 0
-                                    ? 'Importe tabelas de preços para começar a comparar'
-                                    : 'Tente buscar por outro termo'
-                                }
-                            </p>
-                        </div>
+            {/* Estatísticas */}
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-icon primary"><Package size={24} /></div>
+                    <div className="stat-content">
+                        <div className="stat-value">{stats.totalProducts}</div>
+                        <div className="stat-label">Produtos Cadastrados</div>
                     </div>
-                ) : (
-                    <div className="product-list">
-                        {filteredProducts.slice(0, 50).map(product => {
-                            const productPrices = getProductPrices(product.id);
-                            const bestPrice = productPrices[0];
-                            const worstPrice = productPrices[productPrices.length - 1];
-                            const saving = productPrices.length > 1 ? worstPrice.price - bestPrice.price : 0;
-                            const availableDistributors = getAvailableDistributors(product.id);
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon info"><Building2 size={24} /></div>
+                    <div className="stat-content">
+                        <div className="stat-value">{stats.totalDistributors}</div>
+                        <div className="stat-label">Distribuidoras</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon warning"><Zap size={24} /></div>
+                    <div className="stat-content">
+                        <div className="stat-value">{stats.productsWithPrices}</div>
+                        <div className="stat-label">Com Preços Ativos</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon success"><TrendingDown size={24} /></div>
+                    <div className="stat-content">
+                        <div className="stat-value">{formatCurrency(stats.totalSavings)}</div>
+                        <div className="stat-label">Economia Potencial</div>
+                    </div>
+                </div>
+            </div>
 
-                            return (
-                                <div key={product.id} className="product-card">
-                                    <div className="product-header">
-                                        <div>
-                                            <div className="product-name">{product.name}</div>
-                                            {product.ean && (
-                                                <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>EAN: {product.ean}</div>
-                                            )}
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                            {saving > 0 && (
-                                                <div className="saving-badge">
-                                                    <ArrowDownRight size={16} />
-                                                    Economia de {formatCurrency(saving)}
-                                                </div>
-                                            )}
-                                            {availableDistributors.length > 0 && (
-                                                <button
-                                                    className="btn btn-ghost"
-                                                    onClick={() => setAddingPriceProduct(addingPriceProduct === product.id ? null : product.id)}
-                                                    title="Adicionar preço de outra distribuidora"
-                                                    style={{ padding: '4px 8px' }}
-                                                >
-                                                    <Plus size={18} />
-                                                </button>
-                                            )}
-                                        </div>
+            {/* Lista de Produtos com Comparação */}
+            {filteredProducts.length === 0 ? (
+                <div className="card">
+                    <div className="empty-state">
+                        <Package size={64} />
+                        <h3>Nenhum produto encontrado</h3>
+                        <p style={{ marginTop: '8px' }}>
+                            {products.length === 0
+                                ? 'Importe tabelas de preços para começar a comparar'
+                                : 'Tente buscar por outro termo'
+                            }
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="product-list">
+                    {filteredProducts.slice(0, 50).map(product => {
+                        const productPrices = getProductPrices(product.id);
+                        const bestPrice = productPrices[0];
+                        const worstPrice = productPrices[productPrices.length - 1];
+                        const saving = productPrices.length > 1 ? worstPrice.price - bestPrice.price : 0;
+                        const availableDistributors = getAvailableDistributors(product.id);
+
+                        return (
+                            <div key={product.id} className="product-card">
+                                <div className="product-header">
+                                    <div>
+                                        <div className="product-name">{product.name}</div>
+                                        {product.ean && (
+                                            <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>EAN: {product.ean}</div>
+                                        )}
                                     </div>
-
-                                    {/* Formulário de adicionar preço */}
-                                    {addingPriceProduct === product.id && (
-                                        <div style={{
-                                            padding: 'var(--space-md)',
-                                            background: 'var(--bg-tertiary)',
-                                            borderRadius: 'var(--radius-md)',
-                                            marginBottom: 'var(--space-md)',
-                                            display: 'flex',
-                                            gap: 'var(--space-md)',
-                                            alignItems: 'center',
-                                            flexWrap: 'wrap'
-                                        }}>
-                                            <select
-                                                className="form-select"
-                                                value={newPriceDistributor}
-                                                onChange={(e) => setNewPriceDistributor(e.target.value)}
-                                                style={{ minWidth: 200 }}
-                                            >
-                                                <option value="">Selecione a distribuidora...</option>
-                                                {availableDistributors.map(d => (
-                                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                                ))}
-                                            </select>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <span style={{ color: 'var(--text-muted)' }}>R$</span>
-                                                <input
-                                                    type="text"
-                                                    className="form-input"
-                                                    placeholder="0,00"
-                                                    value={newPriceValue}
-                                                    onChange={(e) => setNewPriceValue(e.target.value)}
-                                                    style={{ width: 100 }}
-                                                />
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        {saving > 0 && (
+                                            <div className="saving-badge">
+                                                <ArrowDownRight size={16} />
+                                                Economia de {formatCurrency(saving)}
                                             </div>
-                                            <button
-                                                className="btn btn-success"
-                                                onClick={() => handleAddPrice(product.id)}
-                                                disabled={saving || !newPriceDistributor || !newPriceValue}
-                                            >
-                                                <Check size={16} /> Adicionar
-                                            </button>
+                                        )}
+                                        {availableDistributors.length > 0 && (
                                             <button
                                                 className="btn btn-ghost"
-                                                onClick={() => {
-                                                    setAddingPriceProduct(null);
-                                                    setNewPriceDistributor('');
-                                                    setNewPriceValue('');
+                                                onClick={() => setAddingPriceProduct(addingPriceProduct === product.id ? null : product.id)}
+                                                title="Adicionar preço de outra distribuidora"
+                                                style={{ padding: '4px 8px' }}
+                                            >
+                                                <Plus size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Formulário de adicionar preço */}
+                                {addingPriceProduct === product.id && (
+                                    <div style={{
+                                        padding: 'var(--space-md)',
+                                        background: 'var(--bg-tertiary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        marginBottom: 'var(--space-md)',
+                                        display: 'flex',
+                                        gap: 'var(--space-md)',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap'
+                                    }}>
+                                        <select
+                                            className="form-select"
+                                            value={newPriceDistributor}
+                                            onChange={(e) => setNewPriceDistributor(e.target.value)}
+                                            style={{ minWidth: 200 }}
+                                        >
+                                            <option value="">Selecione a distribuidora...</option>
+                                            {availableDistributors.map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))}
+                                        </select>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>R$</span>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="0,00"
+                                                value={newPriceValue}
+                                                onChange={(e) => setNewPriceValue(e.target.value)}
+                                                style={{ width: 100 }}
+                                            />
+                                        </div>
+                                        <button
+                                            className="btn btn-success"
+                                            onClick={() => handleAddPrice(product.id)}
+                                            disabled={saving || !newPriceDistributor || !newPriceValue}
+                                        >
+                                            <Check size={16} /> Adicionar
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost"
+                                            onClick={() => {
+                                                setAddingPriceProduct(null);
+                                                setNewPriceDistributor('');
+                                                setNewPriceValue('');
+                                            }}
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {productPrices.length === 0 ? (
+                                    <div style={{ padding: 'var(--space-lg)', color: 'var(--text-muted)' }}>
+                                        Nenhum preço cadastrado para este produto
+                                    </div>
+                                ) : (
+                                    <div className="product-prices">
+                                        {productPrices.map((price, idx) => (
+                                            <div
+                                                key={price.id}
+                                                className={`price-card ${idx === 0 ? 'best' : ''}`}
+                                                style={{
+                                                    position: 'relative',
+                                                    border: idx === 0 ? '2px solid var(--accent-success)' : undefined,
+                                                    background: idx === 0 ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)' : undefined
                                                 }}
                                             >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {productPrices.length === 0 ? (
-                                        <div style={{ padding: 'var(--space-lg)', color: 'var(--text-muted)' }}>
-                                            Nenhum preço cadastrado para este produto
-                                        </div>
-                                    ) : (
-                                        <div className="product-prices">
-                                            {productPrices.map((price, idx) => (
-                                                <div
-                                                    key={price.id}
-                                                    className={`price-card ${idx === 0 ? 'best' : ''}`}
-                                                    style={{
-                                                        position: 'relative',
-                                                        border: idx === 0 ? '2px solid var(--accent-success)' : undefined,
-                                                        background: idx === 0 ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)' : undefined
-                                                    }}
-                                                >
-                                                    <div className="distributor">
-                                                        {price.distributors?.name || 'Distribuidora'}
-                                                    </div>
-                                                    <div className="price-value">
-                                                        {editingPrice === price.id ? (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                <span>R$</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={editValue}
-                                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                                    style={{
-                                                                        width: 80,
-                                                                        padding: '4px 8px',
-                                                                        border: '1px solid var(--border-primary)',
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '1rem'
-                                                                    }}
-                                                                    autoFocus
-                                                                    onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(price)}
-                                                                />
-                                                                <button
-                                                                    className="btn btn-ghost"
-                                                                    onClick={() => handleSaveEdit(price)}
-                                                                    disabled={saving}
-                                                                    style={{ padding: '4px' }}
-                                                                >
-                                                                    <Check size={16} color="var(--accent-success)" />
-                                                                </button>
-                                                                <button
-                                                                    className="btn btn-ghost"
-                                                                    onClick={() => setEditingPrice(null)}
-                                                                    style={{ padding: '4px' }}
-                                                                >
-                                                                    <X size={16} />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <span style={{ cursor: 'pointer' }} onClick={() => handleStartEdit(price)}>
-                                                                    {formatCurrency(price.price)}
-                                                                </span>
-                                                                {idx === 0 && <span className="best-label">Melhor</span>}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    {/* Botões de ação */}
-                                                    {editingPrice !== price.id && (
-                                                        <div style={{
-                                                            position: 'absolute',
-                                                            top: '4px',
-                                                            right: '4px',
-                                                            display: 'flex',
-                                                            gap: '2px',
-                                                            opacity: 0.6
-                                                        }}
-                                                            className="price-actions"
-                                                        >
+                                                <div className="distributor">
+                                                    {price.distributors?.name || 'Distribuidora'}
+                                                </div>
+                                                <div className="price-value">
+                                                    {editingPrice === price.id ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span>R$</span>
+                                                            <input
+                                                                type="text"
+                                                                value={editValue}
+                                                                onChange={(e) => setEditValue(e.target.value)}
+                                                                style={{
+                                                                    width: 80,
+                                                                    padding: '4px 8px',
+                                                                    border: '1px solid var(--border-primary)',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '1rem'
+                                                                }}
+                                                                autoFocus
+                                                                onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(price)}
+                                                            />
                                                             <button
                                                                 className="btn btn-ghost"
-                                                                onClick={() => handleStartEdit(price)}
-                                                                style={{ padding: '2px' }}
-                                                                title="Editar preço"
+                                                                onClick={() => handleSaveEdit(price)}
+                                                                disabled={saving}
+                                                                style={{ padding: '4px' }}
                                                             >
-                                                                <Edit2 size={14} />
+                                                                <Check size={16} color="var(--accent-success)" />
                                                             </button>
                                                             <button
                                                                 className="btn btn-ghost"
-                                                                onClick={() => handleDeletePrice(price.id)}
-                                                                style={{ padding: '2px', color: 'var(--accent-danger)' }}
-                                                                title="Excluir preço"
+                                                                onClick={() => setEditingPrice(null)}
+                                                                style={{ padding: '4px' }}
                                                             >
-                                                                <Trash2 size={14} />
+                                                                <X size={16} />
                                                             </button>
                                                         </div>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ cursor: 'pointer' }} onClick={() => handleStartEdit(price)}>
+                                                                {formatCurrency(price.price)}
+                                                            </span>
+                                                            {idx === 0 && <span className="best-label">Melhor</span>}
+                                                        </>
                                                     )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+                                                {/* Botões de ação */}
+                                                {editingPrice !== price.id && (
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '4px',
+                                                        right: '4px',
+                                                        display: 'flex',
+                                                        gap: '2px',
+                                                        opacity: 0.6
+                                                    }}
+                                                        className="price-actions"
+                                                    >
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            onClick={() => handleStartEdit(price)}
+                                                            style={{ padding: '2px' }}
+                                                            title="Editar preço"
+                                                        >
+                                                            <Edit2 size={14} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-ghost"
+                                                            onClick={() => handleDeletePrice(price.id)}
+                                                            style={{ padding: '2px', color: 'var(--accent-danger)' }}
+                                                            title="Excluir preço"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
