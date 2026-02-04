@@ -47,6 +47,35 @@ export default function ShoppingList() {
         ).slice(0, 10);
     }, [searchTerm, products]);
 
+    // Buscar produto por EAN exato
+    const findProductByEan = (ean) => {
+        const cleanEan = ean.replace(/\D/g, ''); // Remove não-dígitos
+        return products.find(p => p.ean && p.ean === cleanEan);
+    };
+
+    // Handler para Enter ou código de barras
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && searchTerm.length >= 2) {
+            // Primeiro, tenta encontrar por EAN exato
+            const productByEan = findProductByEan(searchTerm);
+            if (productByEan) {
+                addToList(productByEan);
+                return;
+            }
+
+            // Se não encontrou por EAN, verifica se tem apenas 1 sugestão
+            if (filteredSuggestions.length === 1) {
+                addToList(filteredSuggestions[0]);
+                return;
+            }
+
+            // Se tem mais de uma sugestão, adiciona a primeira
+            if (filteredSuggestions.length > 0) {
+                addToList(filteredSuggestions[0]);
+            }
+        }
+    };
+
     const findBestPrice = (productId) => {
         const productPrices = prices.filter(p => p.product_id === productId);
         if (productPrices.length === 0) return null;
@@ -136,10 +165,12 @@ export default function ShoppingList() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Buscar por nome ou código de barras..."
+                            placeholder="Bipe o código ou digite e pressione Enter..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyPress={handleKeyPress}
                             style={{ paddingLeft: '40px' }}
+                            autoFocus
                         />
                     </div>
 
