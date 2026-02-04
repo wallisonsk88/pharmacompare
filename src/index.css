@@ -1,8 +1,8 @@
-/* PharmaCompare Pro - Design Premium inspirado em Cotefácil/Bionexo/GoodRx */
+/* PharmaCompare Pro - Design Premium MegaFarma */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Dark Theme - Cores suaves como recomendado para SaaS moderno */
+  /* Dark Theme - Tons escuros com destaque vermelho */
   --bg-primary: #0f1117;
   --bg-secondary: #1a1d26;
   --bg-tertiary: #252833;
@@ -19,30 +19,30 @@
   --text-muted: #6b7280;
   --text-inverse: #111827;
 
-  /* Cores de destaque - Desaturadas para dark mode */
-  --accent-primary: #6366f1;
-  /* Indigo */
-  --accent-primary-hover: #818cf8;
-  --accent-primary-light: rgba(99, 102, 241, 0.15);
+  /* Cores de destaque - Vermelho MegaFarma */
+  --accent-primary: #dc2626;
+  /* Vermelho farmácia */
+  --accent-primary-hover: #ef4444;
+  --accent-primary-light: rgba(220, 38, 38, 0.15);
 
   --accent-success: #10b981;
   /* Verde para "melhor preço" */
   --accent-success-light: rgba(16, 185, 129, 0.15);
 
   --accent-warning: #f59e0b;
-  /* Amarelo/Laranja */
+  /* Amarelo/Laranja - MegaFarma */
   --accent-warning-light: rgba(245, 158, 11, 0.15);
 
   --accent-danger: #ef4444;
-  /* Vermelho */
+  /* Vermelho alerta */
   --accent-danger-light: rgba(239, 68, 68, 0.15);
 
   --accent-info: #06b6d4;
   /* Cyan */
   --accent-info-light: rgba(6, 182, 212, 0.15);
 
-  /* Gradientes */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  /* Gradientes - Vermelho MegaFarma */
+  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
   --gradient-hero: linear-gradient(135deg, #1a1d26 0%, #2d3140 100%);
 
@@ -50,7 +50,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+  --shadow-glow: 0 0 20px rgba(220, 38, 38, 0.3);
 
   /* Espaçamentos */
   --space-xs: 4px;
