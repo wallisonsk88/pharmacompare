@@ -2,16 +2,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Light Theme - Fundo Branco */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #f1f3f5;
+  /* Light Theme - Fundo Vermelho Suave */
+  --bg-primary: #fff8f8;
+  --bg-secondary: #ffeded;
+  --bg-tertiary: #ffe3e3;
   --bg-elevated: #ffffff;
-  --bg-hover: #e9ecef;
+  --bg-hover: #ffdada;
 
   /* Bordas e separadores */
-  --border-primary: #e9ecef;
-  --border-secondary: #dee2e6;
+  --border-primary: #f5e0e0;
+  --border-secondary: #e6cfcf;
 
   /* Texto */
   --text-primary: #212529;
