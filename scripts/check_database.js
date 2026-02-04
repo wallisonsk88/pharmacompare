@@ -82,6 +82,18 @@ async function checkDatabase() {
         console.log(`   Total de preços no banco: ${count}`);
     }
 
+    // 5. Verificar lista de compras
+    console.log('\n5. LISTA DE COMPRAS:');
+    const { data: shoppingItems, error: shoppingError } = await supabase
+        .from('shopping_list')
+        .select('*');
+
+    if (shoppingError) {
+        console.error('   Erro:', shoppingError.message);
+    } else {
+        console.log(`   Total de itens na lista: ${shoppingItems.length}`);
+    }
+
     console.log('\n=== Fim da Verificação ===');
 }
 

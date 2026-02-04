@@ -19,27 +19,41 @@ export default function ShoppingList() {
 
     const loadData = async () => {
         try {
-            const [prods, allPrices, dists, shoppingList] = await Promise.all([
-                getProducts(), getPrices(), getDistributors(), getShoppingList()
+            // Carregar dados principais primeiro
+            const [prods, allPrices, dists] = await Promise.all([
+                getProducts(), getPrices(), getDistributors()
             ]);
-            setProducts(prods);
-            setPrices(allPrices);
-            setDistributors(dists);
-            // Converter dados do banco para formato do componente
-            const formattedList = shoppingList.map(item => ({
-                id: item.id,
-                product_id: item.product_id,
-                name: item.product_name,
-                ean: item.product_ean,
-                price: item.price || 0,
-                distributor_id: item.distributor_id,
-                distributor_name: item.distributor_name || 'Selecione',
-                last_price: item.last_price,
-                last_distributor: item.last_distributor,
-                quantity: item.quantity || 1
-            }));
-            setList(formattedList);
-        } catch (e) { console.error(e); }
+            setProducts(prods || []);
+            setPrices(allPrices || []);
+            setDistributors(dists || []);
+
+            // Tentar carregar lista de compras separadamente (pode falhar se tabela não existir)
+            try {
+                const shoppingList = await getShoppingList();
+                if (shoppingList && shoppingList.length > 0) {
+                    const formattedList = shoppingList.map(item => ({
+                        id: item.id,
+                        product_id: item.product_id,
+                        name: item.product_name,
+                        ean: item.product_ean,
+                        price: item.price || 0,
+                        distributor_id: item.distributor_id,
+                        distributor_name: item.distributor_name || 'Selecione',
+                        last_price: item.last_price,
+                        last_distributor: item.last_distributor,
+                        quantity: item.quantity || 1
+                    }));
+                    setList(formattedList);
+                }
+            } catch (listError) {
+                console.warn('Tabela shopping_list não encontrada, usando lista local:', listError.message);
+                // Fallback para localStorage
+                const savedList = localStorage.getItem('pharmacompare_shopping_list');
+                if (savedList) setList(JSON.parse(savedList));
+            }
+        } catch (e) {
+            console.error('Erro ao carregar dados:', e);
+        }
         setLoading(false);
     };
 
