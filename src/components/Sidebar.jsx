@@ -1,7 +1,7 @@
 import React from 'react';
-import { GitCompare, Upload, Package, TrendingUp, Building2, Settings, BarChart3, ShoppingCart } from 'lucide-react';
+import { GitCompare, Upload, Package, TrendingUp, Building2, Settings, ShoppingCart } from 'lucide-react';
 
-export default function Sidebar({ currentPage, onNavigate }) {
+export default function Sidebar({ currentPage, onNavigate, isOpen }) {
     const menuItems = [
         { id: 'compare', label: 'Comparar Preços', icon: GitCompare },
         { id: 'import', label: 'Importar Tabela', icon: Upload },
@@ -12,7 +12,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
     ];
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
             <div className="sidebar-header">
                 <div className="logo">
                     <img src="/favicon.png" alt="MegaFarma" className="logo-icon" style={{ width: 40, height: 40, objectFit: 'contain' }} />
