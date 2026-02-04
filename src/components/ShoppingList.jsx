@@ -306,7 +306,7 @@ export default function ShoppingList() {
                     </div>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 'var(--space-lg)', alignItems: 'start' }}>
+                <div className="shopping-layout">
                     <div className="card">
                         <div className="table-container">
                             <table className="table">
