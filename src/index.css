@@ -2,57 +2,56 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Dark Theme - Vermelho Sangue */
-  --bg-primary: #110808;
-  --bg-secondary: #1a0c0c;
-  --bg-tertiary: #251010;
-  --bg-elevated: #301414;
-  --bg-hover: #3d1a1a;
+  /* Light Theme - Fundo Branco */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e9ecef;
 
-  /* Bordas e separadores - vermelho sangue */
-  --border-primary: rgba(180, 50, 50, 0.15);
-  --border-secondary: rgba(180, 50, 50, 0.25);
+  /* Bordas e separadores */
+  --border-primary: #e9ecef;
+  --border-secondary: #dee2e6;
 
   /* Texto */
-  --text-primary: #f5eaea;
-  --text-secondary: #c9a8a8;
-  --text-muted: #8b5c5c;
-  --text-inverse: #110808;
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-muted: #868e96;
+  --text-inverse: #ffffff;
 
-  /* Cores de destaque - Vermelho Sangue */
-  --accent-primary: #b91c1c;
-  /* Vermelho sangue principal */
-  --accent-primary-hover: #dc2626;
-  --accent-primary-light: rgba(185, 28, 28, 0.25);
+  /* Cores de destaque - Vermelho MegaFarma #D2352E */
+  --accent-primary: #D2352E;
+  --accent-primary-hover: #b82d27;
+  --accent-primary-light: rgba(210, 53, 46, 0.12);
 
   --accent-success: #10b981;
-  /* Verde para "melhor preço" - mantido para contraste */
-  --accent-success-light: rgba(16, 185, 129, 0.15);
+  /* Verde para "melhor preço" */
+  --accent-success-light: rgba(16, 185, 129, 0.12);
 
-  --accent-warning: #c2410c;
-  /* Laranja sangue */
-  --accent-warning-light: rgba(194, 65, 12, 0.20);
+  --accent-warning: #f59e0b;
+  /* Amarelo/Laranja */
+  --accent-warning-light: rgba(245, 158, 11, 0.12);
 
-  --accent-danger: #7f1d1d;
-  /* Vermelho sangue escuro para alertas */
-  --accent-danger-light: rgba(127, 29, 29, 0.25);
+  --accent-danger: #dc2626;
+  /* Vermelho alerta */
+  --accent-danger-light: rgba(220, 38, 38, 0.12);
 
-  --accent-info: #dc2626;
-  /* Vermelho vivo para info */
-  --accent-info-light: rgba(220, 38, 38, 0.20);
+  --accent-info: #3b82f6;
+  /* Azul info */
+  --accent-info-light: rgba(59, 130, 246, 0.12);
 
-  /* Gradientes - Vermelho Sangue */
-  --gradient-primary: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+  /* Gradientes - Vermelho MegaFarma */
+  --gradient-primary: linear-gradient(135deg, #D2352E 0%, #b82d27 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  --gradient-hero: linear-gradient(135deg, #1a0c0c 0%, #301414 100%);
-  --gradient-card: linear-gradient(135deg, #251010 0%, #1a0c0c 100%);
+  --gradient-hero: linear-gradient(135deg, #D2352E 0%, #b82d27 100%);
+  --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
 
-  /* Sombras - tom vermelho sangue */
-  --shadow-sm: 0 1px 2px rgba(30, 0, 0, 0.5);
-  --shadow-md: 0 4px 12px rgba(50, 0, 0, 0.6);
-  --shadow-lg: 0 8px 24px rgba(50, 0, 0, 0.7);
-  --shadow-glow: 0 0 30px rgba(185, 28, 28, 0.5);
-  --shadow-glow-subtle: 0 0 20px rgba(185, 28, 28, 0.3);
+  /* Sombras - suaves para tema claro */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(210, 53, 46, 0.25);
+  --shadow-glow-subtle: 0 0 12px rgba(210, 53, 46, 0.15);
 
   /* Espaçamentos */
   --space-xs: 4px;
