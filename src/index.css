@@ -921,10 +921,38 @@ body {
   white-space: nowrap;
 }
 
-/* ========== RESPONSIVO ========== */
+/* ========== RESPONSIVO - TABLETS ========== */
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  div[style*="grid-template-columns: 1fr 320px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ========== RESPONSIVO - MOBILE ========== */
 @media (max-width: 768px) {
+
+  /* Sidebar colapsada como ícones */
   .sidebar {
-    width: 70px;
+    width: 60px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+  }
+
+  .sidebar-header {
+    padding: var(--space-sm);
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
   }
 
   .sidebar .logo-text,
@@ -935,20 +963,220 @@ body {
 
   .sidebar .nav-item {
     justify-content: center;
-    padding: var(--space-md);
+    padding: var(--space-sm);
   }
 
+  .sidebar-footer {
+    display: none;
+  }
+
+  /* Área principal */
   .main-content {
-    margin-left: 70px;
-    padding: var(--space-md);
+    margin-left: 60px;
+    padding: var(--space-sm);
+    width: calc(100% - 60px);
   }
 
+  /* Page header */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: var(--space-sm);
+  }
+
+  .page-title {
+    font-size: 1.3rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.8rem;
+  }
+
+  /* Hero de busca */
   .search-hero {
-    padding: var(--space-lg);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
   }
 
   .search-hero h1 {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
+  }
+
+  .search-hero p {
+    font-size: 0.85rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .search-input-large {
+    padding: var(--space-md) var(--space-md) var(--space-md) 44px;
+    font-size: 0.9rem;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .stat-card {
+    padding: var(--space-sm);
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .stat-value {
+    font-size: 1.1rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+  }
+
+  /* Cards */
+  .card {
+    padding: var(--space-sm);
+  }
+
+  /* Tabelas - scroll horizontal */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 500px;
+    font-size: 0.8rem;
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-sm);
+  }
+
+  /* Product list */
+  .product-list {
+    gap: var(--space-sm);
+  }
+
+  .product-card {
+    border-radius: var(--radius-md);
+  }
+
+  .product-header {
+    padding: var(--space-sm);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .product-name {
+    font-size: 0.95rem;
+  }
+
+  .saving-badge {
+    font-size: 0.75rem;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .product-prices {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+  }
+
+  .price-card {
+    padding: var(--space-sm);
+  }
+
+  .price-card .distributor {
+    font-size: 0.75rem;
+  }
+
+  .price-card .price-value {
+    font-size: 1.1rem;
+  }
+
+  .best-label {
+    font-size: 0.55rem;
+    padding: 1px 6px;
+  }
+
+  /* Botões */
+  .btn {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.85rem;
+  }
+
+  /* Formulários */
+  .form-input,
+  .form-select {
+    padding: var(--space-sm);
+    font-size: 0.9rem;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    padding: var(--space-lg);
+  }
+
+  /* Lista de compras - layout especial */
+  div[style*="grid-template-columns: 1fr 320px"] {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Modal */
+  .modal {
+    width: 95%;
+    padding: var(--space-md);
+  }
+}
+
+/* ========== RESPONSIVO - MOBILE PEQUENO ========== */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 50px;
+  }
+
+  .main-content {
+    margin-left: 50px;
+    width: calc(100% - 50px);
+    padding: var(--space-xs);
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stat-card {
+    padding: var(--space-xs);
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .product-prices {
+    grid-template-columns: 1fr;
+  }
+
+  .search-hero h1 {
+    font-size: 1rem;
+  }
+
+  .page-title {
+    font-size: 1.1rem;
+  }
+
+  .table {
+    min-width: 400px;
+    font-size: 0.75rem;
   }
 }
 
