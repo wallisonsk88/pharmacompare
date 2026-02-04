@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, Search, Plus, Trash2, Package, Building2, Minus, Trash, Download } from 'lucide-react';
-import { getProducts, getPrices, getDistributors } from '../config/supabase';
+import { ShoppingCart, Search, Plus, Trash2, Package, Building2, Minus, Download, Save, Edit2, Check, X } from 'lucide-react';
+import { getProducts, getPrices, getDistributors, createPrice } from '../config/supabase';
 
 export default function ShoppingList() {
     const [products, setProducts] = useState([]);
     const [prices, setPrices] = useState([]);
     const [distributors, setDistributors] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [editingItem, setEditingItem] = useState(null);
+    const [editPrice, setEditPrice] = useState('');
     const [list, setList] = useState(() => {
         const savedList = localStorage.getItem('pharmacompare_shopping_list');
         return savedList ? JSON.parse(savedList) : [];
@@ -47,53 +50,38 @@ export default function ShoppingList() {
         ).slice(0, 10);
     }, [searchTerm, products]);
 
-    // Buscar produto por EAN exato
     const findProductByEan = (ean) => {
-        const cleanEan = ean.replace(/\D/g, ''); // Remove não-dígitos
+        const cleanEan = ean.replace(/\D/g, '');
         return products.find(p => p.ean && p.ean === cleanEan);
     };
 
-    // Handler para Enter ou código de barras
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && searchTerm.length >= 2) {
-            // Primeiro, tenta encontrar por EAN exato
             const productByEan = findProductByEan(searchTerm);
             if (productByEan) {
                 addToList(productByEan);
                 return;
             }
-
-            // Se não encontrou por EAN, verifica se tem apenas 1 sugestão
-            if (filteredSuggestions.length === 1) {
-                addToList(filteredSuggestions[0]);
-                return;
-            }
-
-            // Se tem mais de uma sugestão, adiciona a primeira
-            if (filteredSuggestions.length > 0) {
+            if (filteredSuggestions.length >= 1) {
                 addToList(filteredSuggestions[0]);
             }
         }
     };
 
-    const findBestPrice = (productId) => {
+    // Busca o último preço registrado para um produto
+    const getLastPrice = (productId) => {
         const productPrices = prices.filter(p => p.product_id === productId);
         if (productPrices.length === 0) return null;
 
-        // Pegar o preço mais recente por distribuidora e depois o mais barato de todos
-        const byDistributor = {};
-        productPrices.forEach(p => {
-            const distId = p.distributor_id;
-            if (!byDistributor[distId] || new Date(p.recorded_at) > new Date(byDistributor[distId].recorded_at)) {
-                byDistributor[distId] = p;
-            }
-        });
-
-        return Object.values(byDistributor).sort((a, b) => a.price - b.price)[0];
+        // Ordena por data mais recente
+        const sorted = productPrices.sort((a, b) =>
+            new Date(b.recorded_at) - new Date(a.recorded_at)
+        );
+        return sorted[0];
     };
 
     const addToList = (product) => {
-        const bestPrice = findBestPrice(product.id);
+        const lastPrice = getLastPrice(product.id);
         const existingItem = list.find(item => item.product_id === product.id);
 
         if (existingItem) {
@@ -103,9 +91,11 @@ export default function ShoppingList() {
                 product_id: product.id,
                 name: product.name,
                 ean: product.ean,
-                price: bestPrice ? bestPrice.price : 0,
-                distributor_id: bestPrice ? bestPrice.distributor_id : null,
-                distributor_name: bestPrice ? (bestPrice.distributors?.name || 'N/A') : 'S/ Preço',
+                price: lastPrice ? lastPrice.price : 0,
+                distributor_id: lastPrice ? lastPrice.distributor_id : (distributors[0]?.id || null),
+                distributor_name: lastPrice ? (lastPrice.distributors?.name || 'N/A') : (distributors[0]?.name || 'Selecione'),
+                last_price: lastPrice ? lastPrice.price : null,
+                last_distributor: lastPrice ? (lastPrice.distributors?.name || null) : null,
                 quantity: 1
             };
             setList([...list, newItem]);
@@ -130,6 +120,82 @@ export default function ShoppingList() {
         }
     };
 
+    // Atualizar distribuidor de um item
+    const updateDistributor = (productId, distributorId) => {
+        const dist = distributors.find(d => d.id === distributorId);
+        setList(list.map(item =>
+            item.product_id === productId ? {
+                ...item,
+                distributor_id: distributorId,
+                distributor_name: dist?.name || 'N/A'
+            } : item
+        ));
+    };
+
+    // Iniciar edição de preço
+    const startEditPrice = (item) => {
+        setEditingItem(item.product_id);
+        setEditPrice(item.price > 0 ? item.price.toString().replace('.', ',') : '');
+    };
+
+    // Salvar edição de preço
+    const saveEditPrice = (productId) => {
+        const priceValue = parseFloat(editPrice.replace(',', '.'));
+        if (!isNaN(priceValue) && priceValue >= 0) {
+            setList(list.map(item =>
+                item.product_id === productId ? { ...item, price: priceValue } : item
+            ));
+        }
+        setEditingItem(null);
+        setEditPrice('');
+    };
+
+    // Cancelar edição
+    const cancelEdit = () => {
+        setEditingItem(null);
+        setEditPrice('');
+    };
+
+    // Salvar preços no banco de dados
+    const saveAllPrices = async () => {
+        const itemsWithPrice = list.filter(item => item.price > 0 && item.distributor_id);
+
+        if (itemsWithPrice.length === 0) {
+            alert('Nenhum item com preço e distribuidor para salvar.');
+            return;
+        }
+
+        setSaving(true);
+        let savedCount = 0;
+        let errorCount = 0;
+
+        for (const item of itemsWithPrice) {
+            try {
+                await createPrice({
+                    product_id: item.product_id,
+                    distributor_id: item.distributor_id,
+                    price: item.price
+                });
+                savedCount++;
+            } catch (error) {
+                console.error('Erro ao salvar preço:', error);
+                errorCount++;
+            }
+        }
+
+        setSaving(false);
+
+        // Recarregar preços após salvar
+        const allPrices = await getPrices();
+        setPrices(allPrices);
+
+        if (errorCount === 0) {
+            alert(`✅ ${savedCount} preço(s) salvos com sucesso!\n\nNa próxima lista, esses valores aparecerão como referência.`);
+        } else {
+            alert(`⚠️ ${savedCount} salvo(s), ${errorCount} erro(s).`);
+        }
+    };
+
     const total = list.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     if (loading) {
@@ -145,15 +211,20 @@ export default function ShoppingList() {
 
     return (
         <div className="main-content">
-            <div className="page-header flex justify-between items-center">
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                 <div>
                     <h1 className="page-title">🛒 Lista de Compras</h1>
-                    <p className="page-subtitle">Adicione produtos e encontre os melhores preços automaticamente</p>
+                    <p className="page-subtitle">Adicione produtos, informe os preços e salve para referência futura</p>
                 </div>
                 {list.length > 0 && (
-                    <button className="btn btn-danger" onClick={clearList}>
-                        <Trash2 size={18} /> Limpar Lista
-                    </button>
+                    <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+                        <button className="btn btn-success" onClick={saveAllPrices} disabled={saving}>
+                            <Save size={18} /> {saving ? 'Salvando...' : 'Salvar Preços'}
+                        </button>
+                        <button className="btn btn-danger" onClick={clearList}>
+                            <Trash2 size={18} /> Limpar
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -185,31 +256,42 @@ export default function ShoppingList() {
                             boxShadow: 'var(--shadow-lg)',
                             padding: 'var(--space-sm)'
                         }}>
-                            {filteredSuggestions.map(product => (
-                                <button
-                                    key={product.id}
-                                    className="suggestion-item flex items-center gap-md p-sm"
-                                    onClick={() => addToList(product)}
-                                    style={{
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        background: 'none',
-                                        border: 'none',
-                                        borderRadius: 'var(--radius-sm)',
-                                        cursor: 'pointer',
-                                        padding: 'var(--space-sm)'
-                                    }}
-                                >
-                                    <div className="stat-icon info" style={{ width: 32, height: 32 }}>
-                                        <Package size={16} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 600 }}>{product.name}</div>
-                                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>EAN: {product.ean || '-'}</div>
-                                    </div>
-                                    <Plus size={18} style={{ color: 'var(--accent-primary)' }} />
-                                </button>
-                            ))}
+                            {filteredSuggestions.map(product => {
+                                const lastPrice = getLastPrice(product.id);
+                                return (
+                                    <button
+                                        key={product.id}
+                                        className="suggestion-item flex items-center gap-md p-sm"
+                                        onClick={() => addToList(product)}
+                                        style={{
+                                            width: '100%',
+                                            textAlign: 'left',
+                                            background: 'none',
+                                            border: 'none',
+                                            borderRadius: 'var(--radius-sm)',
+                                            cursor: 'pointer',
+                                            padding: 'var(--space-sm)'
+                                        }}
+                                    >
+                                        <div className="stat-icon info" style={{ width: 32, height: 32 }}>
+                                            <Package size={16} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600 }}>{product.name}</div>
+                                            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                {lastPrice ? (
+                                                    <span style={{ color: 'var(--accent-success)' }}>
+                                                        Último: {formatCurrency(lastPrice.price)} em {lastPrice.distributors?.name || 'N/A'}
+                                                    </span>
+                                                ) : (
+                                                    <span>EAN: {product.ean || '-'}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Plus size={18} style={{ color: 'var(--accent-primary)' }} />
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -243,16 +325,73 @@ export default function ShoppingList() {
                                         <tr key={item.product_id}>
                                             <td>
                                                 <div style={{ fontWeight: 600 }}>{item.name}</div>
-                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>EAN: {item.ean || '-'}</div>
+                                                {item.last_price && (
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-info)' }}>
+                                                        Último: {formatCurrency(item.last_price)} ({item.last_distributor})
+                                                    </div>
+                                                )}
                                             </td>
                                             <td>
-                                                <div className="flex items-center gap-sm">
-                                                    <Building2 size={14} />
-                                                    {item.distributor_name}
-                                                </div>
+                                                <select
+                                                    className="form-select"
+                                                    value={item.distributor_id || ''}
+                                                    onChange={(e) => updateDistributor(item.product_id, e.target.value)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        fontSize: '0.85rem',
+                                                        minWidth: '120px'
+                                                    }}
+                                                >
+                                                    <option value="">Selecione</option>
+                                                    {distributors.map(d => (
+                                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                                    ))}
+                                                </select>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                {item.price > 0 ? formatCurrency(item.price) : <span className="text-muted">N/A</span>}
+                                                {editingItem === item.product_id ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ fontSize: '0.85rem' }}>R$</span>
+                                                        <input
+                                                            type="text"
+                                                            value={editPrice}
+                                                            onChange={(e) => setEditPrice(e.target.value)}
+                                                            onKeyPress={(e) => e.key === 'Enter' && saveEditPrice(item.product_id)}
+                                                            className="form-input"
+                                                            style={{
+                                                                width: '70px',
+                                                                padding: '4px 8px',
+                                                                fontSize: '0.85rem',
+                                                                textAlign: 'right'
+                                                            }}
+                                                            autoFocus
+                                                        />
+                                                        <button className="btn btn-ghost p-xs" onClick={() => saveEditPrice(item.product_id)} style={{ color: 'var(--accent-success)' }}>
+                                                            <Check size={14} />
+                                                        </button>
+                                                        <button className="btn btn-ghost p-xs" onClick={cancelEdit} style={{ color: 'var(--accent-danger)' }}>
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => startEditPrice(item)}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: '1px dashed var(--border-secondary)',
+                                                            borderRadius: 'var(--radius-sm)',
+                                                            padding: '4px 12px',
+                                                            cursor: 'pointer',
+                                                            color: item.price > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        {item.price > 0 ? formatCurrency(item.price) : 'Informar'}
+                                                        <Edit2 size={12} />
+                                                    </button>
+                                                )}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div className="flex items-center justify-center gap-sm">
@@ -295,6 +434,10 @@ export default function ShoppingList() {
                                 <span className="text-muted">Total Unidades:</span>
                                 <span style={{ fontWeight: 600 }}>{list.reduce((sum, item) => sum + item.quantity, 0)}</span>
                             </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted">Com preço:</span>
+                                <span style={{ fontWeight: 600 }}>{list.filter(i => i.price > 0).length}</span>
+                            </div>
                             <div style={{ borderTop: '1px solid var(--border-primary)', marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)' }}>
                                 <div className="flex justify-between items-end">
                                     <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>Total Geral</span>
@@ -303,7 +446,10 @@ export default function ShoppingList() {
                                     </span>
                                 </div>
                             </div>
-                            <button className="btn btn-primary w-full mt-lg" onClick={() => window.print()}>
+                            <button className="btn btn-success w-full mt-lg" onClick={saveAllPrices} disabled={saving}>
+                                <Save size={18} /> {saving ? 'Salvando...' : 'Salvar Preços'}
+                            </button>
+                            <button className="btn btn-primary w-full" onClick={() => window.print()}>
                                 <Download size={18} /> Exportar / Imprimir
                             </button>
                         </div>
