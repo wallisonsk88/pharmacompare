@@ -938,9 +938,29 @@ body {
 /* ========== LAYOUT DA LISTA DE COMPRAS ========== */
 .shopping-layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 280px;
   gap: var(--space-lg);
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.shopping-layout>.card:first-child {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.shopping-layout .table-container {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* ========== RESPONSIVO - TELAS MÉDIAS ========== */
+@media (max-width: 1280px) {
+  .shopping-layout {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
 }
 
 /* ========== RESPONSIVO - TABLETS ========== */
