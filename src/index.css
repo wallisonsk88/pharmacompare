@@ -1,56 +1,58 @@
-/* PharmaCompare Pro - Design Premium MegaFarma */
+/* MegaFarma - Sistema de Comparação de Preços */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Dark Theme - Tons escuros com destaque vermelho */
-  --bg-primary: #0f1117;
-  --bg-secondary: #1a1d26;
-  --bg-tertiary: #252833;
-  --bg-elevated: #2d3140;
-  --bg-hover: #353948;
+  /* Dark Theme - Tons escuros com influência vermelha */
+  --bg-primary: #120a0a;
+  --bg-secondary: #1f1214;
+  --bg-tertiary: #2a1a1c;
+  --bg-elevated: #352224;
+  --bg-hover: #3d2a2c;
 
-  /* Bordas e separadores */
-  --border-primary: rgba(255, 255, 255, 0.08);
-  --border-secondary: rgba(255, 255, 255, 0.12);
+  /* Bordas e separadores - tom avermelhado */
+  --border-primary: rgba(255, 200, 200, 0.08);
+  --border-secondary: rgba(255, 200, 200, 0.12);
 
-  /* Texto - off-white para menos cansaço visual */
-  --text-primary: #f0f2f5;
-  --text-secondary: #a0a6b5;
-  --text-muted: #6b7280;
-  --text-inverse: #111827;
+  /* Texto */
+  --text-primary: #f5f0f0;
+  --text-secondary: #b5a0a0;
+  --text-muted: #806b6b;
+  --text-inverse: #1a1111;
 
   /* Cores de destaque - Vermelho MegaFarma */
   --accent-primary: #dc2626;
-  /* Vermelho farmácia */
+  /* Vermelho principal */
   --accent-primary-hover: #ef4444;
-  --accent-primary-light: rgba(220, 38, 38, 0.15);
+  --accent-primary-light: rgba(220, 38, 38, 0.18);
 
   --accent-success: #10b981;
-  /* Verde para "melhor preço" */
+  /* Verde para "melhor preço" - mantido para contraste */
   --accent-success-light: rgba(16, 185, 129, 0.15);
 
-  --accent-warning: #f59e0b;
-  /* Amarelo/Laranja - MegaFarma */
-  --accent-warning-light: rgba(245, 158, 11, 0.15);
+  --accent-warning: #ea580c;
+  /* Laranja avermelhado */
+  --accent-warning-light: rgba(234, 88, 12, 0.18);
 
-  --accent-danger: #ef4444;
-  /* Vermelho alerta */
-  --accent-danger-light: rgba(239, 68, 68, 0.15);
+  --accent-danger: #b91c1c;
+  /* Vermelho escuro para alertas */
+  --accent-danger-light: rgba(185, 28, 28, 0.18);
 
-  --accent-info: #06b6d4;
-  /* Cyan */
-  --accent-info-light: rgba(6, 182, 212, 0.15);
+  --accent-info: #f87171;
+  /* Vermelho claro/rosa para info */
+  --accent-info-light: rgba(248, 113, 113, 0.18);
 
   /* Gradientes - Vermelho MegaFarma */
-  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  --gradient-success: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
-  --gradient-hero: linear-gradient(135deg, #1a1d26 0%, #2d3140 100%);
+  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-hero: linear-gradient(135deg, #1f1214 0%, #352224 100%);
+  --gradient-card: linear-gradient(135deg, #2a1a1c 0%, #1f1214 100%);
 
-  /* Sombras para dark mode */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(220, 38, 38, 0.3);
+  /* Sombras - tom avermelhado */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(20, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(20, 0, 0, 0.6);
+  --shadow-glow: 0 0 25px rgba(220, 38, 38, 0.4);
+  --shadow-glow-subtle: 0 0 15px rgba(220, 38, 38, 0.2);
 
   /* Espaçamentos */
   --space-xs: 4px;
