@@ -129,8 +129,21 @@ export default function Import() {
             }
 
             if (priceCol === -1) {
-                priceCol = 1; // Fallback: segunda coluna é normalmente o preço
-                console.log('Fallback: usando coluna 1 como preço');
+                // Fallback: segunda coluna é normalmente o preço, mas não pode ser a coluna de EAN
+                priceCol = eanCol === 1 ? 2 : 1;
+                console.log('Fallback: usando coluna', priceCol, 'como preço');
+            }
+
+            // IMPORTANTE: Se a coluna de preço é igual à de EAN, isso está errado!
+            if (priceCol === eanCol) {
+                // Procura outra coluna que não seja produto nem EAN
+                for (let i = 0; i < rows[0].length; i++) {
+                    if (i !== productCol && i !== eanCol) {
+                        priceCol = i;
+                        console.log('Corrigindo: coluna de preço mudada para', priceCol);
+                        break;
+                    }
+                }
             }
 
             // Se a coluna de produto e preço são iguais, ajustar
@@ -175,11 +188,12 @@ export default function Import() {
                         originalPrice,
                         cleanedPrice: priceStr,
                         parsedPrice: priceVal,
-                        isValid: !isNaN(priceVal) && priceVal > 0
+                        isValid: !isNaN(priceVal) && priceVal > 0 && priceVal < 100000
                     });
                 }
 
-                if (!productName || productName.length < 2 || isNaN(priceVal) || priceVal <= 0) {
+                // Validação: preço deve ser válido e menor que R$ 100.000 (evita código de barras)
+                if (!productName || productName.length < 2 || isNaN(priceVal) || priceVal <= 0 || priceVal > 99999.99) {
                     results.errors++;
                     continue;
                 }
