@@ -1135,15 +1135,31 @@ body {
     padding: var(--space-lg);
   }
 
+  /* FORÇAR TODOS OS ELEMENTOS A RESPEITAR A LARGURA */
+  .main-content * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
   /* Lista de compras - layout especial */
-  div[style*="grid-template-columns: 1fr 320px"] {
+  div[style*="grid-template-columns: 1fr 320px"],
+  div[style*="grid-template-columns"] {
     display: flex !important;
     flex-direction: column !important;
     gap: var(--space-md) !important;
+    width: 100% !important;
+  }
+
+  /* Todos os cards - largura total */
+  .card {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
   }
 
   /* Resumo da compra - ajustes mobile */
-  div[style*="grid-template-columns: 1fr 320px"]>.card:last-child {
+  div[style*="grid-template-columns: 1fr 320px"]>.card:last-child,
+  div[style*="grid-template-columns"]>.card {
     width: 100% !important;
     max-width: 100% !important;
   }
@@ -1151,14 +1167,39 @@ body {
   /* Botões - quebra de texto e ajuste */
   .btn {
     white-space: normal !important;
-    word-wrap: break-word;
-    text-align: center;
+    word-wrap: break-word !important;
+    text-align: center !important;
     min-height: 44px;
+    flex-shrink: 1 !important;
+    padding: var(--space-sm) var(--space-md) !important;
   }
 
   .btn.w-full {
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  /* Grupos de botões */
+  div[style*="gap"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* Tabela responsiva */
+  .table {
+    font-size: 0.75rem !important;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 4px !important;
+  }
+
+  /* Selects e inputs menores */
+  .form-select,
+  .form-input {
+    font-size: 0.8rem !important;
+    padding: 6px !important;
+    min-width: auto !important;
   }
 
   /* Modal */
