@@ -107,7 +107,8 @@ export const getProducts = async () => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('name');
+      .order('name')
+      .range(0, 10000); // Supabase limita a 1000 por padrão, aqui aumentamos para 10000
     if (error) throw error;
     return data;
   }
@@ -201,7 +202,8 @@ export const getPrices = async () => {
         products:product_id(*),
         distributors:distributor_id(*)
       `)
-      .order('recorded_at', { ascending: false });
+      .order('recorded_at', { ascending: false })
+      .range(0, 50000); // Supabase limita a 1000 por padrão
     if (error) throw error;
     return data;
   }
