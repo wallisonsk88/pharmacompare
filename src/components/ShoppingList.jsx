@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, Search, Plus, Trash2, Package, Building2, Minus, Download, Save, Edit2, Check, X } from 'lucide-react';
-import { getProducts, getPrices, getDistributors, createPrice } from '../config/supabase';
+import { getProducts, getPrices, getDistributors, createPrice, getShoppingList, addShoppingItem, updateShoppingItem, deleteShoppingItem, clearShoppingList } from '../config/supabase';
 
 export default function ShoppingList() {
     const [products, setProducts] = useState([]);
@@ -11,27 +11,34 @@ export default function ShoppingList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [editingItem, setEditingItem] = useState(null);
     const [editPrice, setEditPrice] = useState('');
-    const [list, setList] = useState(() => {
-        const savedList = localStorage.getItem('pharmacompare_shopping_list');
-        return savedList ? JSON.parse(savedList) : [];
-    });
+    const [list, setList] = useState([]);
 
     useEffect(() => {
         loadData();
     }, []);
 
-    useEffect(() => {
-        localStorage.setItem('pharmacompare_shopping_list', JSON.stringify(list));
-    }, [list]);
-
     const loadData = async () => {
         try {
-            const [prods, allPrices, dists] = await Promise.all([
-                getProducts(), getPrices(), getDistributors()
+            const [prods, allPrices, dists, shoppingList] = await Promise.all([
+                getProducts(), getPrices(), getDistributors(), getShoppingList()
             ]);
             setProducts(prods);
             setPrices(allPrices);
             setDistributors(dists);
+            // Converter dados do banco para formato do componente
+            const formattedList = shoppingList.map(item => ({
+                id: item.id,
+                product_id: item.product_id,
+                name: item.product_name,
+                ean: item.product_ean,
+                price: item.price || 0,
+                distributor_id: item.distributor_id,
+                distributor_name: item.distributor_name || 'Selecione',
+                last_price: item.last_price,
+                last_distributor: item.last_distributor,
+                quantity: item.quantity || 1
+            }));
+            setList(formattedList);
         } catch (e) { console.error(e); }
         setLoading(false);
     };
@@ -68,25 +75,30 @@ export default function ShoppingList() {
         }
     };
 
-    // Busca o último preço registrado para um produto
     const getLastPrice = (productId) => {
         const productPrices = prices.filter(p => p.product_id === productId);
         if (productPrices.length === 0) return null;
-
-        // Ordena por data mais recente
         const sorted = productPrices.sort((a, b) =>
             new Date(b.recorded_at) - new Date(a.recorded_at)
         );
         return sorted[0];
     };
 
-    const addToList = (product) => {
+    const addToList = async (product) => {
         const lastPrice = getLastPrice(product.id);
         const existingItem = list.find(item => item.product_id === product.id);
 
         if (existingItem) {
-            updateQuantity(product.id, existingItem.quantity + 1);
+            // Atualizar quantidade
+            const newQty = existingItem.quantity + 1;
+            try {
+                await updateShoppingItem(existingItem.id, { ...existingItem, quantity: newQty });
+                setList(list.map(item =>
+                    item.product_id === product.id ? { ...item, quantity: newQty } : item
+                ));
+            } catch (e) { console.error(e); }
         } else {
+            // Adicionar novo item
             const newItem = {
                 product_id: product.id,
                 name: product.name,
@@ -98,65 +110,92 @@ export default function ShoppingList() {
                 last_distributor: lastPrice ? (lastPrice.distributors?.name || null) : null,
                 quantity: 1
             };
-            setList([...list, newItem]);
+            try {
+                const savedItem = await addShoppingItem(newItem);
+                setList([...list, { ...newItem, id: savedItem.id }]);
+            } catch (e) { console.error(e); }
         }
         setSearchTerm('');
     };
 
-    const updateQuantity = (productId, newQty) => {
+    const updateQuantity = async (productId, newQty) => {
         if (newQty < 1) return;
-        setList(list.map(item =>
-            item.product_id === productId ? { ...item, quantity: newQty } : item
-        ));
-    };
-
-    const removeFromList = (productId) => {
-        setList(list.filter(item => item.product_id !== productId));
-    };
-
-    const clearList = () => {
-        if (confirm('Deseja limpar toda a lista?')) {
-            setList([]);
+        const item = list.find(i => i.product_id === productId);
+        if (item) {
+            try {
+                await updateShoppingItem(item.id, { ...item, quantity: newQty });
+                setList(list.map(i =>
+                    i.product_id === productId ? { ...i, quantity: newQty } : i
+                ));
+            } catch (e) { console.error(e); }
         }
     };
 
-    // Atualizar distribuidor de um item
-    const updateDistributor = (productId, distributorId) => {
-        const dist = distributors.find(d => d.id === distributorId);
-        setList(list.map(item =>
-            item.product_id === productId ? {
-                ...item,
-                distributor_id: distributorId,
-                distributor_name: dist?.name || 'N/A'
-            } : item
-        ));
+    const removeFromList = async (productId) => {
+        const item = list.find(i => i.product_id === productId);
+        if (item) {
+            try {
+                await deleteShoppingItem(item.id);
+                setList(list.filter(i => i.product_id !== productId));
+            } catch (e) { console.error(e); }
+        }
     };
 
-    // Iniciar edição de preço
+    const clearList = async () => {
+        if (confirm('Deseja limpar toda a lista?')) {
+            try {
+                await clearShoppingList();
+                setList([]);
+            } catch (e) { console.error(e); }
+        }
+    };
+
+    const updateDistributor = async (productId, distributorId) => {
+        const dist = distributors.find(d => d.id === distributorId);
+        const item = list.find(i => i.product_id === productId);
+        if (item) {
+            try {
+                await updateShoppingItem(item.id, {
+                    ...item,
+                    distributor_id: distributorId,
+                    distributor_name: dist?.name || 'N/A'
+                });
+                setList(list.map(i =>
+                    i.product_id === productId ? {
+                        ...i,
+                        distributor_id: distributorId,
+                        distributor_name: dist?.name || 'N/A'
+                    } : i
+                ));
+            } catch (e) { console.error(e); }
+        }
+    };
+
     const startEditPrice = (item) => {
         setEditingItem(item.product_id);
         setEditPrice(item.price > 0 ? item.price.toString().replace('.', ',') : '');
     };
 
-    // Salvar edição de preço
-    const saveEditPrice = (productId) => {
+    const saveEditPrice = async (productId) => {
         const priceValue = parseFloat(editPrice.replace(',', '.'));
-        if (!isNaN(priceValue) && priceValue >= 0) {
-            setList(list.map(item =>
-                item.product_id === productId ? { ...item, price: priceValue } : item
-            ));
+        const item = list.find(i => i.product_id === productId);
+        if (!isNaN(priceValue) && priceValue >= 0 && item) {
+            try {
+                await updateShoppingItem(item.id, { ...item, price: priceValue });
+                setList(list.map(i =>
+                    i.product_id === productId ? { ...i, price: priceValue } : i
+                ));
+            } catch (e) { console.error(e); }
         }
         setEditingItem(null);
         setEditPrice('');
     };
 
-    // Cancelar edição
     const cancelEdit = () => {
         setEditingItem(null);
         setEditPrice('');
     };
 
-    // Salvar preços no banco de dados
     const saveAllPrices = async () => {
         const itemsWithPrice = list.filter(item => item.price > 0 && item.distributor_id);
 
@@ -185,7 +224,6 @@ export default function ShoppingList() {
 
         setSaving(false);
 
-        // Recarregar preços após salvar
         const allPrices = await getPrices();
         setPrices(allPrices);
 
@@ -214,7 +252,7 @@ export default function ShoppingList() {
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                 <div>
                     <h1 className="page-title">🛒 Lista de Compras</h1>
-                    <p className="page-subtitle">Adicione produtos, informe os preços e salve para referência futura</p>
+                    <p className="page-subtitle">Lista sincronizada - acesse de qualquer dispositivo</p>
                 </div>
                 {list.length > 0 && (
                     <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
@@ -228,7 +266,6 @@ export default function ShoppingList() {
                 )}
             </div>
 
-            {/* Busca de Produtos */}
             <div className="card mb-lg">
                 <div className="search-box" style={{ position: 'relative' }}>
                     <div className="search-input-wrapper">

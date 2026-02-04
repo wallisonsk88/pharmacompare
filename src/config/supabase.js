@@ -379,3 +379,92 @@ export const clearAllData = async () => {
   localStorage.removeItem(STORAGE_KEYS.distributors);
   return true;
 };
+
+// ========== LISTA DE COMPRAS ==========
+
+// Buscar toda a lista de compras
+export const getShoppingList = async () => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from('shopping_list')
+      .select('*')
+      .order('created_at');
+    if (error) throw error;
+    return data || [];
+  }
+  // Fallback para localStorage
+  const data = localStorage.getItem('pharmacompare_shopping_list');
+  return data ? JSON.parse(data) : [];
+};
+
+// Adicionar item à lista
+export const addShoppingItem = async (item) => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from('shopping_list')
+      .insert([{
+        product_id: item.product_id,
+        product_name: item.name,
+        product_ean: item.ean,
+        price: item.price || 0,
+        distributor_id: item.distributor_id,
+        distributor_name: item.distributor_name,
+        quantity: item.quantity || 1,
+        last_price: item.last_price,
+        last_distributor: item.last_distributor
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  return item;
+};
+
+// Atualizar item da lista
+export const updateShoppingItem = async (id, updates) => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from('shopping_list')
+      .update({
+        price: updates.price,
+        distributor_id: updates.distributor_id,
+        distributor_name: updates.distributor_name,
+        quantity: updates.quantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  return updates;
+};
+
+// Remover item da lista
+export const deleteShoppingItem = async (id) => {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase
+      .from('shopping_list')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+  return true;
+};
+
+// Limpar toda a lista de compras
+export const clearShoppingList = async () => {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase
+      .from('shopping_list')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+    return true;
+  }
+  localStorage.removeItem('pharmacompare_shopping_list');
+  return true;
+};
