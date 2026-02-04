@@ -1139,6 +1139,26 @@ body {
   div[style*="grid-template-columns: 1fr 320px"] {
     display: flex !important;
     flex-direction: column !important;
+    gap: var(--space-md) !important;
+  }
+
+  /* Resumo da compra - ajustes mobile */
+  div[style*="grid-template-columns: 1fr 320px"]>.card:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Botões - quebra de texto e ajuste */
+  .btn {
+    white-space: normal !important;
+    word-wrap: break-word;
+    text-align: center;
+    min-height: 44px;
+  }
+
+  .btn.w-full {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* Modal */
