@@ -104,13 +104,27 @@ export const deleteDistributor = async (id) => {
 // PRODUTOS
 export const getProducts = async () => {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('name')
-      .range(0, 10000); // Supabase limita a 1000 por padrão, aqui aumentamos para 10000
-    if (error) throw error;
-    return data;
+    // Buscar todos os produtos em lotes para contornar o limite de 1000 do Supabase
+    let allProducts = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name')
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allProducts = allProducts.concat(data);
+      if (data.length < batchSize) break; // Último lote
+      from += batchSize;
+    }
+
+    return allProducts;
   }
   return getLocalData('products');
 };
