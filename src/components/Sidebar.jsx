@@ -15,8 +15,8 @@ export default function Sidebar({ currentPage, onNavigate }) {
         <aside className="sidebar">
             <div className="sidebar-header">
                 <div className="logo">
-                    <div className="logo-icon">💊</div>
-                    <span className="logo-text">PharmaCompare</span>
+                    <img src="/favicon.png" alt="MegaFarma" className="logo-icon" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+                    <span className="logo-text">MegaFarma</span>
                 </div>
             </div>
 
