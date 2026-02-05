@@ -23,8 +23,23 @@ export default function SettingsPage() {
                 a.download = fileName;
                 a.click();
                 URL.revokeObjectURL(url);
+            } else if (format === 'csv') {
+                // Para CSV, exportamos apenas os preços que contém Nome, EAN e Valor (CSV só suporta uma aba)
+                const pricesForExport = data.prices.map(p => ({
+                    "Nome do Produto": p.products?.name || '',
+                    "Código de Barras (EAN)": p.products?.ean || '',
+                    "Preço": p.price || 0,
+                    "Distribuidora": p.distributors?.name || '',
+                    "Data Registro": p.recorded_at ? new Date(p.recorded_at).toLocaleDateString() : ''
+                }));
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(pricesForExport);
+                XLSX.utils.book_append_sheet(wb, ws, "Preços");
+                const fileName = `pharmacompare_precos_${new Date().toISOString().split('T')[0]}.csv`;
+                XLSX.writeFile(wb, fileName, { bookType: 'csv' });
             } else {
                 const wb = XLSX.utils.book_new();
+                // ... rest of the excel export (keeping existing logic for xlsx)
 
                 // Adicionar cada tabela como uma aba no Excel
                 if (data.distributors) {
@@ -115,22 +130,33 @@ export default function SettingsPage() {
                         };
 
                         wb.SheetNames.forEach(sheetName => {
-                            const key = sheetMap[sheetName];
-                            if (!key) return;
-
+                            let key = sheetMap[sheetName];
                             const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+
+                            // Se tiver apenas uma aba (como no CSV), e não encontrou no map, 
+                            // tentamos detectar pelo cabeçalho
+                            if (!key && wb.SheetNames.length === 1 && sheetData.length > 0) {
+                                const headers = Object.keys(sheetData[0]).map(h => h.toLowerCase());
+                                if (headers.some(h => h.includes('nome do produto') || h.includes('código de barras (ean)') || h.includes('nome') || h.includes('ean'))) {
+                                    key = 'products'; // Assume produtos se tiver nome ou ean
+                                } else if (headers.some(h => h.includes('preço') || h.includes('valor'))) {
+                                    key = 'prices'; // Assume preços se tiver preço ou valor
+                                }
+                            }
+
+                            if (!key) return;
 
                             // Mapeamento reverso para importar com nomes amigáveis
                             if (key === 'products') {
                                 importedData[key] = sheetData.map(row => ({
-                                    name: row["Nome do Produto"] || row["name"],
-                                    ean: row["Código de Barras (EAN)"] || row["ean"],
-                                    category: row["Categoria"] || row["category"],
-                                    manufacturer: row["Fabricante"] || row["manufacturer"]
+                                    name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"],
+                                    ean: row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"],
+                                    category: row["Categoria"] || row["category"] || 'generico',
+                                    manufacturer: row["Fabricante"] || row["manufacturer"] || ''
                                 }));
                             } else if (key === 'prices') {
                                 importedData[key] = sheetData.map(row => ({
-                                    price: row["Preço"] || row["price"],
+                                    price: row["Preço"] || row["price"] || row["valor"],
                                     // Outros campos dependem de joins, então no import simplificado 
                                     // precisamos ter cuidado ou confiar no export JSON para backup total.
                                     // Para Excel, buscaremos IDs se possível ou usaremos o que tiver.
