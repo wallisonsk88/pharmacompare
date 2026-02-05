@@ -177,16 +177,31 @@ export default function SettingsPage() {
                                 } else if (key === 'prices') {
                                     extracted = sheetData
                                         .map(row => {
-                                            const priceRaw = row[colMap.price] || '0';
+                                            const raw = row[colMap.price];
+                                            let priceVal = 0;
+
+                                            if (typeof raw === 'number') {
+                                                priceVal = raw;
+                                            } else {
+                                                const s = String(raw || '0').replace('R$', '').replace(/\s/g, '');
+                                                if (s.includes(',') && s.includes('.')) {
+                                                    priceVal = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+                                                } else if (s.includes(',')) {
+                                                    priceVal = parseFloat(s.replace(',', '.'));
+                                                } else {
+                                                    priceVal = parseFloat(s);
+                                                }
+                                            }
+
                                             return {
-                                                price: parseFloat(String(priceRaw).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.')),
+                                                price: priceVal,
                                                 name: row[colMap.name] || '',
                                                 ean: String(row[colMap.ean] || '').trim(),
                                                 distributor: row[colMap.distributor] || '',
                                                 ...row
                                             };
                                         })
-                                        .filter(p => p.price > 0 && (p["product_id"] || p.name));
+                                        .filter(p => !isNaN(p.price) && p.price > 0 && (p["product_id"] || p.name));
                                 } else {
                                     extracted = sheetData;
                                 }

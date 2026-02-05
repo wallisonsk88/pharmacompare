@@ -58,12 +58,20 @@ async function run() {
             if (lowerKey.includes('produto')) {
                 name = String(val).trim();
             } else if (lowerKey.includes('pre') || lowerKey.includes('valor')) {
-                let priceStr = String(val || '')
-                    .replace('R$', '')
-                    .replace(/\s/g, '')
-                    .replace('.', '') // Remove ponto de milhar se houver
-                    .replace(',', '.'); // Converte decimal
-                priceVal = parseFloat(priceStr);
+                if (typeof val === 'number') {
+                    priceVal = val;
+                } else {
+                    let priceStr = String(val || '')
+                        .replace('R$', '')
+                        .replace(/\s/g, '');
+                    if (priceStr.includes(',') && priceStr.includes('.')) {
+                        priceVal = parseFloat(priceStr.replace(/\./g, '').replace(',', '.'));
+                    } else if (priceStr.includes(',')) {
+                        priceVal = parseFloat(priceStr.replace(',', '.'));
+                    } else {
+                        priceVal = parseFloat(priceStr);
+                    }
+                }
             } else if (lowerKey.includes('ean') || lowerKey.includes('barras') || lowerKey.includes('codigo')) {
                 ean = String(val || '').trim();
             } else if (lowerKey.includes('distribuidora')) {
