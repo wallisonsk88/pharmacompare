@@ -1462,6 +1462,16 @@ body::-webkit-scrollbar {
   }
 }
 
+/* Utilities */
+.no-print {
+  display: block;
+}
+
+.print-only {
+  display: none;
+}
+
+
 @media print {
   @page {
     margin: 1cm;
@@ -1533,6 +1543,22 @@ body::-webkit-scrollbar {
     border-bottom: 1px solid #ddd !important;
     color: #000 !important;
     padding: 8px 4px !important;
+  }
+
+  /* Forçar nomes de produtos a serem pretos na impressão */
+  .product-name,
+  [style*="color: rgb(255, 255, 255)"],
+  [style*="color: #fff"],
+  [style*="color: #ffffff"] {
+    color: #000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   /* Cores de texto */

@@ -19,7 +19,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const CSV_PATH = 'C:/Users/Wallison/Desktop/melhores_precos.csv';
 
 async function run() {
-    console.log('--- Iniciando Importação Principal (FarmaPlano) ---');
+    console.log('--- Iniciando Importação Principal (MEGAFARMA) ---');
     console.log('Arquivo:', CSV_PATH);
 
     if (!fs.existsSync(CSV_PATH)) {

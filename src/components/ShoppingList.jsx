@@ -328,7 +328,7 @@ export default function ShoppingList() {
                                             <Package size={16} />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, color: '#fff' }}>{product.name}</div>
+                                            <div className="product-name">{product.name}</div>
                                             <div className="text-muted" style={{ fontSize: '0.75rem' }}>
                                                 {lastPrice ? (
                                                     <span style={{ color: 'var(--accent-success)' }}>
@@ -375,7 +375,7 @@ export default function ShoppingList() {
                                     {list.map(item => (
                                         <tr key={item.product_id}>
                                             <td>
-                                                <div style={{ fontWeight: 600, color: '#fff' }}>{item.name}</div>
+                                                <div className="product-name">{item.name}</div>
                                                 {item.last_price && (
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--accent-info)' }}>
                                                         Último: {formatCurrency(item.last_price)} ({item.last_distributor})
@@ -401,7 +401,7 @@ export default function ShoppingList() {
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {editingItem === item.product_id ? (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <span style={{ fontSize: '0.85rem' }}>R$</span>
                                                         <input
                                                             type="text"
@@ -425,32 +425,38 @@ export default function ShoppingList() {
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => startEditPrice(item)}
-                                                        style={{
-                                                            background: 'none',
-                                                            border: '1px dashed var(--border-secondary)',
-                                                            borderRadius: 'var(--radius-sm)',
-                                                            padding: '4px 12px',
-                                                            cursor: 'pointer',
-                                                            color: item.price > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }}
-                                                    >
-                                                        {item.price > 0 ? formatCurrency(item.price) : 'Informar'}
-                                                        <Edit2 size={12} />
-                                                    </button>
+                                                    <>
+                                                        <span className="print-only" style={{ fontWeight: 600 }}>{item.price > 0 ? formatCurrency(item.price) : '-'}</span>
+                                                        <button
+                                                            className="no-print"
+                                                            onClick={() => startEditPrice(item)}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: '1px dashed var(--border-secondary)',
+                                                                borderRadius: 'var(--radius-sm)',
+                                                                padding: '4px 12px',
+                                                                cursor: 'pointer',
+                                                                color: item.price > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                width: '100%',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                        >
+                                                            {item.price > 0 ? formatCurrency(item.price) : 'Informar'}
+                                                            <Edit2 size={12} />
+                                                        </button>
+                                                    </>
                                                 )}
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div className="flex items-center justify-center gap-sm">
-                                                    <button className="btn btn-ghost p-xs" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
+                                                    <button className="btn btn-ghost p-xs no-print" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
                                                         <Minus size={14} />
                                                     </button>
                                                     <span style={{ minWidth: '30px', fontWeight: 600 }}>{item.quantity}</span>
-                                                    <button className="btn btn-ghost p-xs" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
+                                                    <button className="btn btn-ghost p-xs no-print" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
                                                         <Plus size={14} />
                                                     </button>
                                                 </div>
