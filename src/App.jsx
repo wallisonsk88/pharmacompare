@@ -8,9 +8,16 @@ import Distributors from './components/Distributors';
 import Products from './components/Products';
 import ShoppingList from './components/ShoppingList';
 import SettingsPage from './components/Settings';
+import { Menu, X } from 'lucide-react';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('compare');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    setSidebarOpen(false); // Fecha sidebar ao navegar no mobile
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -27,7 +34,28 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      {/* Botão Hamburger - só aparece no mobile */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Menu"
+      >
+        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Overlay para fechar sidebar ao clicar fora */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        isOpen={sidebarOpen}
+      />
       {renderPage()}
     </div>
   );

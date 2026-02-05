@@ -1,8 +1,239 @@
 import React from 'react';
-import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle } from 'lucide-react';
-import { isSupabaseConfigured, clearAllData } from '../config/supabase';
+import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle, Download, Upload as UploadIcon, FileJson, Loader } from 'lucide-react';
+import { isSupabaseConfigured, clearAllData, exportFullDatabase, importFullDatabase, smartImportFromSpreadsheet } from '../config/supabase';
+import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
+    const [isExporting, setIsExporting] = React.useState(false);
+    const [isImporting, setIsImporting] = React.useState(false);
+    const fileInputRef = React.useRef(null);
+
+    const handleExport = async (format = 'xlsx') => {
+        setIsExporting(true);
+        try {
+            const data = await exportFullDatabase();
+
+            if (format === 'json') {
+                const fileName = `pharmacompare_backup_${new Date().toISOString().split('T')[0]}.json`;
+                const jsonStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                URL.revokeObjectURL(url);
+            } else if (format === 'csv') {
+                // Para CSV, exportamos apenas os preços que contém Nome, EAN e Valor (CSV só suporta uma aba)
+                const pricesForExport = data.prices.map(p => ({
+                    "Nome do Produto": p.products?.name || '',
+                    "Código de Barras (EAN)": p.products?.ean || '',
+                    "Preço": p.price || 0,
+                    "Distribuidora": p.distributors?.name || '',
+                    "Data Registro": p.recorded_at ? new Date(p.recorded_at).toLocaleDateString() : ''
+                }));
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(pricesForExport);
+                XLSX.utils.book_append_sheet(wb, ws, "Preços");
+                const fileName = `pharmacompare_precos_${new Date().toISOString().split('T')[0]}.csv`;
+                XLSX.writeFile(wb, fileName, { bookType: 'csv' });
+            } else {
+                const wb = XLSX.utils.book_new();
+                // ... rest of the excel export (keeping existing logic for xlsx)
+
+                // Adicionar cada tabela como uma aba no Excel
+                if (data.distributors) {
+                    const ws = XLSX.utils.json_to_sheet(data.distributors);
+                    XLSX.utils.book_append_sheet(wb, ws, "Distribuidoras");
+                }
+                if (data.products) {
+                    // Mapear campos para nomes amigáveis
+                    const productsForExport = data.products.map(p => ({
+                        "Nome do Produto": p.name || '',
+                        "Código de Barras (EAN)": p.ean || '',
+                        "Categoria": p.category || '',
+                        "Fabricante": p.manufacturer || ''
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(productsForExport);
+                    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+                }
+                if (data.prices) {
+                    // Mapear campos para nomes amigáveis incluindo nome do produto e EAN
+                    const pricesForExport = data.prices.map(p => ({
+                        "Nome do Produto": p.products?.name || '',
+                        "Código de Barras (EAN)": p.products?.ean || '',
+                        "Preço": p.price || 0,
+                        "Distribuidora": p.distributors?.name || '',
+                        "Data Registro": p.recorded_at ? new Date(p.recorded_at).toLocaleDateString() : ''
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(pricesForExport);
+                    XLSX.utils.book_append_sheet(wb, ws, "Preços");
+                }
+                if (data.shopping_list) {
+                    const ws = XLSX.utils.json_to_sheet(data.shopping_list);
+                    XLSX.utils.book_append_sheet(wb, ws, "Lista de Compras");
+                }
+
+                const fileName = `pharmacompare_export_${new Date().toISOString().split('T')[0]}.${format}`;
+                XLSX.writeFile(wb, fileName, { bookType: format });
+            }
+
+            alert('Exportação concluída com sucesso!');
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao exportar dados: ' + error.message);
+        }
+        setIsExporting(false);
+    };
+
+    const handleImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!confirm('ATENÇÃO: Importar um backup irá APAGAR todos os dados atuais e substituí-los pelos dados do arquivo. Deseja continuar?')) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        setIsImporting(true);
+        try {
+            const fileName = file.name.toLowerCase();
+
+            if (fileName.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const data = JSON.parse(evt.target.result);
+                        await importFullDatabase(data);
+                        alert('Banco de dados restaurado com sucesso!');
+                        window.location.reload();
+                    } catch (err) {
+                        alert('Erro ao processar JSON: ' + err.message);
+                        setIsImporting(false);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const bstr = evt.target.result;
+                        const wb = XLSX.read(bstr, { type: 'binary' });
+                        const importedData = {};
+
+                        console.log('Processando planilhas do Excel/CSV...', wb.SheetNames);
+
+                        // Mapeamento de nomes de abas para chaves do banco
+                        const sheetMap = {
+                            "Distribuidoras": "distributors",
+                            "Produtos": "products",
+                            "Preços": "prices",
+                            "Lista de Compras": "shopping_list"
+                        };
+                        wb.SheetNames.forEach(sheetName => {
+                            const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+                            if (sheetData.length === 0) return;
+
+                            const sampleRow = sheetData[0];
+                            const colMap = {};
+                            Object.keys(sampleRow).forEach(col => {
+                                const cleanCol = col.toLowerCase().trim();
+                                if (cleanCol.includes('produto') || cleanCol.includes('nome') || cleanCol === 'name') colMap.name = col;
+                                if (cleanCol.includes('preço') || cleanCol.includes('valor') || cleanCol === 'price') colMap.price = col;
+                                if (cleanCol.includes('ean') || cleanCol.includes('barras') || cleanCol.includes('codigo')) colMap.ean = col;
+                                if (cleanCol.includes('distribuidora') || cleanCol.includes('fornecedor')) colMap.distributor = col;
+                                if (cleanCol.includes('categoria')) colMap.category = col;
+                                if (cleanCol.includes('fabricante')) colMap.manufacturer = col;
+                            });
+
+                            // Determinar quais tipos de dados essa aba contém
+                            const possibleKeys = [];
+                            const mappedKey = sheetMap[sheetName];
+
+                            if (mappedKey) {
+                                possibleKeys.push(mappedKey);
+                            } else {
+                                // Auto-detecção (pode ser múltiplos!)
+                                if (colMap.name) possibleKeys.push('products');
+                                if (colMap.price) possibleKeys.push('prices');
+                                if (colMap.distributor && !colMap.name && !colMap.price) possibleKeys.push('distributors');
+                            }
+
+                            possibleKeys.forEach(key => {
+                                console.log(`Extraindo "${key}" da aba "${sheetName}". Colunas:`, colMap);
+
+                                if (!importedData[key]) importedData[key] = [];
+
+                                let extracted = [];
+                                if (key === 'products') {
+                                    extracted = sheetData
+                                        .map(row => ({
+                                            name: row[colMap.name] || '',
+                                            ean: String(row[colMap.ean] || '').trim(),
+                                            category: row[colMap.category] || 'generico',
+                                            manufacturer: row[colMap.manufacturer] || ''
+                                        }))
+                                        .filter(p => p.name && String(p.name).trim().length > 0);
+                                } else if (key === 'prices') {
+                                    extracted = sheetData
+                                        .map(row => {
+                                            const raw = row[colMap.price];
+                                            let priceVal = 0;
+
+                                            if (typeof raw === 'number') {
+                                                priceVal = raw;
+                                            } else {
+                                                const s = String(raw || '0').replace('R$', '').replace(/\s/g, '');
+                                                if (s.includes(',') && s.includes('.')) {
+                                                    priceVal = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+                                                } else if (s.includes(',')) {
+                                                    priceVal = parseFloat(s.replace(',', '.'));
+                                                } else {
+                                                    priceVal = parseFloat(s);
+                                                }
+                                            }
+
+                                            return {
+                                                price: priceVal,
+                                                name: row[colMap.name] || '',
+                                                ean: String(row[colMap.ean] || '').trim(),
+                                                distributor: row[colMap.distributor] || '',
+                                                ...row
+                                            };
+                                        })
+                                        .filter(p => !isNaN(p.price) && p.price > 0 && (p["product_id"] || p.name));
+                                } else {
+                                    extracted = sheetData;
+                                }
+
+                                importedData[key] = [...importedData[key], ...extracted];
+                            });
+                        });
+
+                        if (Object.keys(importedData).length === 0) {
+                            throw new Error('Nenhum dado válido encontrado no arquivo. Verifique os nomes das colunas (Nome, Preço, EAN).');
+                        }
+
+                        console.log('Enviando para smartImport...', importedData);
+                        const result = await smartImportFromSpreadsheet(importedData);
+
+                        alert(`Importação concluída!\nProdutos: ${result.totals.products}\nPreços: ${result.totals.prices}\nDistribuidoras: ${result.totals.distributors}`);
+                        window.location.reload();
+                    } catch (err) {
+                        console.error('Erro no processamento do Excel:', err);
+                        alert('Erro ao processar arquivo: ' + err.message);
+                        setIsImporting(false);
+                    }
+                };
+                reader.readAsBinaryString(file);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao importar dados: ' + error.message);
+            setIsImporting(false);
+        }
+    };
+
     return (
         <div className="main-content">
             <div className="page-header">
@@ -65,6 +296,62 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                {/* Backup e Restauração */}
+                <div className="card">
+                    <h3 className="card-title mb-lg"><Database size={20} /> Backup e Restauração</h3>
+                    <p className="text-muted mb-lg" style={{ fontSize: '0.85rem' }}>
+                        Exporte todo o seu banco de dados para segurança ou migração.
+                        O arquivo gerado contém distribuidoras, produtos, preços e sua lista de compras.
+                    </p>
+
+                    <div className="flex gap-md wrap">
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => handleExport('xlsx')}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <Download size={18} />}
+                            Exportar Excel (.xlsx)
+                        </button>
+
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => handleExport('csv')}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <FileJson size={18} />}
+                            Exportar CSV (.csv)
+                        </button>
+
+                        <button
+                            className="btn btn-tertiary"
+                            onClick={() => handleExport('json')}
+                            disabled={isExporting}
+                            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <Database size={18} />}
+                            Exportar JSON (.json)
+                        </button>
+
+                        <button
+                            className="btn btn-success"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                        >
+                            {isImporting ? <Loader size={18} className="loading-spinner" /> : <UploadIcon size={18} />}
+                            Importar Banco
+                        </button>
+
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleImport}
+                        />
                     </div>
                 </div>
             </div>

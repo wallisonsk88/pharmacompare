@@ -35,12 +35,26 @@ const setLocalData = (key, data) => {
 // DISTRIBUIDORAS
 export const getDistributors = async () => {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('distributors')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    return data;
+    let allDistributors = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('distributors')
+        .select('*')
+        .order('name')
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allDistributors = allDistributors.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+
+    return allDistributors;
   }
   return getLocalData('distributors');
 };
@@ -209,17 +223,30 @@ export const deleteProduct = async (id) => {
 // PREÇOS
 export const getPrices = async () => {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('prices')
-      .select(`
-        *,
-        products:product_id(*),
-        distributors:distributor_id(*)
-      `)
-      .order('recorded_at', { ascending: false })
-      .range(0, 50000); // Supabase limita a 1000 por padrão
-    if (error) throw error;
-    return data;
+    let allPrices = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('prices')
+        .select(`
+          *,
+          products:product_id(*),
+          distributors:distributor_id(*)
+        `)
+        .order('recorded_at', { ascending: false })
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allPrices = allPrices.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+
+    return allPrices;
   }
   const prices = getLocalData('prices');
   const products = getLocalData('products');
@@ -467,4 +494,261 @@ export const clearShoppingList = async () => {
   }
   localStorage.removeItem('pharmacompare_shopping_list');
   return true;
+};
+// ========== BACKUP E RESTAURAÇÃO ==========
+
+export const exportFullDatabase = async () => {
+  try {
+    const [distributors, products, prices, shoppingList] = await Promise.all([
+      getDistributors(),
+      getProducts(),
+      getPrices(),
+      getShoppingList()
+    ]);
+
+    return {
+      distributors,
+      products,
+      prices,
+      shopping_list: shoppingList,
+      exported_at: new Date().toISOString(),
+      version: '1.0'
+    };
+  } catch (error) {
+    console.error('Erro ao exportar banco de dados:', error);
+    throw error;
+  }
+};
+
+// Função para importar dados em massa (restauração completa)
+export const importFullDatabase = async (data) => {
+  try {
+    // Validação mínima: verificar se há algum dado para importar
+    const hasDistributors = data.distributors && data.distributors.length > 0;
+    const hasProducts = data.products && data.products.length > 0;
+    const hasPrices = data.prices && data.prices.length > 0;
+    const hasShopping = data.shopping_list && data.shopping_list.length > 0;
+
+    if (!hasDistributors && !hasProducts && !hasPrices && !hasShopping) {
+      throw new Error('O arquivo de importação não contém dados válidos ou reconhecidos.');
+    }
+
+    console.log('Iniciando importação...', {
+      distributors: data.distributors?.length || 0,
+      products: data.products?.length || 0,
+      prices: data.prices?.length || 0,
+      shopping: data.shopping_list?.length || 0
+    });
+
+    // 1. Limpar dados atuais (APENAS se tivermos algo novo para colocar)
+    await clearAllData();
+
+    // 2. Importar distribuidoras
+    if (hasDistributors) {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('distributors').insert(data.distributors);
+        if (error) throw new Error('Erro ao inserir distribuidoras: ' + error.message);
+      } else {
+        localStorage.setItem(STORAGE_KEYS.distributors, JSON.stringify(data.distributors));
+      }
+    }
+
+    // 3. Importar produtos
+    if (hasProducts) {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('products').insert(data.products);
+        if (error) throw new Error('Erro ao inserir produtos: ' + error.message);
+      } else {
+        localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data.products));
+      }
+    }
+
+    // 4. Importar preços
+    if (hasPrices) {
+      if (isSupabaseConfigured) {
+        // Filtrar campos que vêm do SELECT join (products, distributors) ou nomes amigáveis do export Excel
+        // Mantemos apenas colunas que REALMENTE existem na tabela prices
+        const validColumns = ['id', 'product_id', 'distributor_id', 'price', 'min_quantity', 'validity', 'recorded_at'];
+
+        const rawPrices = data.prices.map(p => {
+          const cleanPrice = {};
+          validColumns.forEach(col => {
+            if (p[col] !== undefined) cleanPrice[col] = p[col];
+          });
+
+          // Se não tem product_id mas tem id (caso de backup fiel), mantém
+          // Se não tem nada disso, o insert vai falhar e o catch pega
+          return cleanPrice;
+        });
+
+        if (rawPrices.length > 0) {
+          const { error } = await supabase.from('prices').insert(rawPrices);
+          if (error) throw new Error('Erro ao inserir preços: ' + error.message);
+        }
+      } else {
+        localStorage.setItem(STORAGE_KEYS.prices, JSON.stringify(data.prices));
+      }
+    }
+
+    // 5. Importar lista de compras
+    if (hasShopping) {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('shopping_list').insert(data.shopping_list);
+        if (error) throw new Error('Erro ao inserir lista de compras: ' + error.message);
+      } else {
+        localStorage.setItem('pharmacompare_shopping_list', JSON.stringify(data.shopping_list));
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erro detalhado na importação:', error);
+    throw error;
+  }
+};
+
+// Função para importar dados de forma inteligente (Merge/Upsert)
+// Útil para Planilhas Excel/CSV que não são backups completos
+// Função para importar dados de forma inteligente (Merge/Upsert) - VERSÃO OTIMIZADA PARA VELOCIDADE E GRANDES DATASETS
+export const smartImportFromSpreadsheet = async (data) => {
+  try {
+    const results = { success: 0, errors: 0, totals: { distributors: 0, products: 0, prices: 0 } };
+
+    console.log('Iniciando smartImport Otimizado V2...', {
+      distributors: data.distributors?.length || 0,
+      products: data.products?.length || 0,
+      prices: data.prices?.length || 0
+    });
+
+    // 1. Carregar Caches iniciais (Batch Fetch com Paginação para > 1000 itens)
+    const fetchAll = async (table, select = '*') => {
+      let items = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data: batch, error } = await supabase.from(table).select(select).range(from, from + step - 1);
+        if (error) throw error;
+        if (!batch || batch.length === 0) break;
+        items = [...items, ...batch];
+        if (batch.length < step) break;
+        from += step;
+      }
+      return items;
+    };
+
+    const [allDistributors, allProducts] = await Promise.all([
+      fetchAll('distributors', 'id, name'),
+      fetchAll('products', 'id, name, ean')
+    ]);
+
+    const normalize = (s) => String(s || '').toLowerCase().trim();
+
+    const distMap = new Map(allDistributors.map(d => [normalize(d.name), d.id]));
+    const prodMap = new Map(allProducts.map(p => [normalize(p.name), p.id]));
+    const eanMap = new Map(allProducts.filter(p => p.ean).map(p => [String(p.ean).trim(), p.id]));
+
+    // 2. Processar Distribuidoras (Inserção em Lote)
+    if (data.distributors && data.distributors.length > 0) {
+      const newDists = data.distributors
+        .filter(d => d.name && !distMap.has(normalize(d.name)))
+        .map(d => ({ name: d.name.trim() }));
+
+      if (newDists.length > 0) {
+        const { data: created, error } = await supabase.from('distributors').insert(newDists).select();
+        if (error) throw error;
+        created.forEach(d => distMap.set(normalize(d.name), d.id));
+        results.totals.distributors = newDists.length;
+      }
+    }
+
+    // 3. Processar Produtos (Inserção em Lote)
+    if (data.products && data.products.length > 0) {
+      const newProds = [];
+      for (const p of data.products) {
+        const normName = normalize(p.name);
+        const normEan = String(p.ean || '').trim();
+
+        // Tentar encontrar por Nome ou EAN (se tiver)
+        const existingId = prodMap.get(normName) || (normEan ? eanMap.get(normEan) : null);
+
+        if (!existingId && p.name) {
+          newProds.push({
+            name: p.name.trim(),
+            ean: p.ean || null,
+            category: p.category || 'generico',
+            manufacturer: p.manufacturer || ''
+          });
+        } else if (existingId && p.ean && !eanMap.has(normEan)) {
+          // Atualizar EAN se existir o produto mas não o código
+          await supabase.from('products').update({ ean: p.ean }).eq('id', existingId);
+          eanMap.set(normEan, existingId);
+        }
+      }
+
+      if (newProds.length > 0) {
+        const { data: created, error } = await supabase.from('products').insert(newProds).select();
+        if (error) throw error;
+        created.forEach(p => {
+          prodMap.set(normalize(p.name), p.id);
+          if (p.ean) eanMap.set(String(p.ean).trim(), p.id);
+        });
+        results.totals.products = newProds.length;
+      }
+    }
+
+    // 4. Processar Preços (Prepara em memória e insere em lote)
+    if (data.prices && data.prices.length > 0) {
+      const pricesToInsert = [];
+
+      for (const p of data.prices) {
+        try {
+          const dName = normalize(p.distributor || p["Distribuidora"] || p.name_distributor || 'Importado');
+          const pName = normalize(p.name || p["Nome do Produto"] || p.product_name);
+          const pEan = String(p.ean || p["Código de Barras (EAN)"] || p.product_ean || '').trim();
+
+          // A. Resolver Distribuidora
+          let distributor_id = distMap.get(dName);
+          if (!distributor_id && dName) {
+            const { data: newDist, error: dErr } = await supabase.from('distributors').insert([{ name: p.distributor || p["Distribuidora"] || 'Importado' }]).select().single();
+            if (newDist) {
+              distributor_id = newDist.id;
+              distMap.set(dName, distributor_id);
+            }
+          }
+
+          // B. Resolver Produto (Nome -> EAN)
+          let product_id = prodMap.get(pName) || (pEan ? eanMap.get(pEan) : null);
+
+          if (!product_id && pName) {
+            const { data: newProd } = await supabase.from('products').insert([{ name: p.name || p["Nome do Produto"], ean: pEan || null }]).select().single();
+            if (newProd) {
+              product_id = newProd.id;
+              prodMap.set(pName, product_id);
+              if (pEan) eanMap.set(pEan, product_id);
+            }
+          }
+
+          if (product_id && distributor_id && p.price > 0) {
+            pricesToInsert.push({
+              product_id,
+              distributor_id,
+              price: p.price,
+              recorded_at: p.recorded_at || new Date().toISOString()
+            });
+          }
+        } catch (e) { results.errors++; }
+      }
+
+      if (pricesToInsert.length > 0) {
+        const { error } = await supabase.from('prices').insert(pricesToInsert);
+        if (error) throw error;
+        results.totals.prices = pricesToInsert.length;
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Erro no smartImport Otimizado:', error);
+    throw error;
+  }
 };
