@@ -468,3 +468,87 @@ export const clearShoppingList = async () => {
   localStorage.removeItem('pharmacompare_shopping_list');
   return true;
 };
+// ========== BACKUP E RESTAURAÇÃO ==========
+
+export const exportFullDatabase = async () => {
+  try {
+    const [distributors, products, prices, shoppingList] = await Promise.all([
+      getDistributors(),
+      getProducts(),
+      getPrices(),
+      getShoppingList()
+    ]);
+
+    return {
+      distributors,
+      products,
+      prices,
+      shopping_list: shoppingList,
+      exported_at: new Date().toISOString(),
+      version: '1.0'
+    };
+  } catch (error) {
+    console.error('Erro ao exportar banco de dados:', error);
+    throw error;
+  }
+};
+
+// Função para importar dados em massa (restauração completa)
+export const importFullDatabase = async (data) => {
+  try {
+    // 1. Limpar dados atuais
+    await clearAllData();
+
+    // 2. Importar distribuidoras (primeiro, por causa das chaves estrangeiras)
+    if (data.distributors && data.distributors.length > 0) {
+      if (isSupabaseConfigured) {
+        // No Supabase, se os IDs originais forem fornecidos, ele tentará usá-los. 
+        // Isso é bom para manter a integridade referencial do backup.
+        const { error } = await supabase.from('distributors').insert(data.distributors);
+        if (error) throw error;
+      } else {
+        localStorage.setItem(STORAGE_KEYS.distributors, JSON.stringify(data.distributors));
+      }
+    }
+
+    // 3. Importar produtos
+    if (data.products && data.products.length > 0) {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('products').insert(data.products);
+        if (error) throw error;
+      } else {
+        localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data.products));
+      }
+    }
+
+    // 4. Importar preços
+    if (data.prices && data.prices.length > 0) {
+      if (isSupabaseConfigured) {
+        // Filtrar campos que vêm do SELECT join (products, distributors) mas não existem na tabela prices
+        const rawPrices = data.prices.map(p => {
+          const { products, distributors, ...rest } = p;
+          return rest;
+        });
+        const { error } = await supabase.from('prices').insert(rawPrices);
+        if (error) throw error;
+      } else {
+        localStorage.setItem(STORAGE_KEYS.prices, JSON.stringify(data.prices));
+      }
+    }
+
+    // 5. Importar lista de compras
+    if (data.shopping_list && data.shopping_list.length > 0) {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('shopping_list').insert(data.shopping_list);
+        if (error) throw error;
+      } else {
+        localStorage.setItem('pharmacompare_shopping_list', JSON.stringify(data.shopping_list));
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao importar banco de dados:', error);
+    throw error;
+  }
+};

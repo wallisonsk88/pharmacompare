@@ -1,8 +1,104 @@
 import React from 'react';
-import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle } from 'lucide-react';
-import { isSupabaseConfigured, clearAllData } from '../config/supabase';
+import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle, Download, Upload as UploadIcon, FileJson, Loader } from 'lucide-react';
+import { isSupabaseConfigured, clearAllData, exportFullDatabase, importFullDatabase } from '../config/supabase';
+import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
+    const [isExporting, setIsExporting] = React.useState(false);
+    const [isImporting, setIsImporting] = React.useState(false);
+    const fileInputRef = React.useRef(null);
+
+    const handleExport = async (format = 'xlsx') => {
+        setIsExporting(true);
+        try {
+            const data = await exportFullDatabase();
+            const wb = XLSX.utils.book_new();
+
+            // Adicionar cada tabela como uma aba no Excel
+            if (data.distributors) {
+                const ws = XLSX.utils.json_to_sheet(data.distributors);
+                XLSX.utils.book_append_sheet(wb, ws, "Distribuidoras");
+            }
+            if (data.products) {
+                const ws = XLSX.utils.json_to_sheet(data.products);
+                XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+            }
+            if (data.prices) {
+                // Limpar campos de join para o export ser limpo
+                const cleanPrices = data.prices.map(({ products, distributors, ...rest }) => rest);
+                const ws = XLSX.utils.json_to_sheet(cleanPrices);
+                XLSX.utils.book_append_sheet(wb, ws, "Preços");
+            }
+            if (data.shopping_list) {
+                const ws = XLSX.utils.json_to_sheet(data.shopping_list);
+                XLSX.utils.book_append_sheet(wb, ws, "Lista de Compras");
+            }
+
+            const fileName = `pharmacompare_backup_${new Date().toISOString().split('T')[0]}.${format}`;
+            XLSX.writeFile(wb, fileName, { bookType: format });
+
+            alert('Exportação concluída com sucesso!');
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao exportar dados: ' + error.message);
+        }
+        setIsExporting(false);
+    };
+
+    const handleImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!confirm('ATENÇÃO: Importar um backup irá APAGAR todos os dados atuais e substituí-los pelos dados do arquivo. Deseja continuar?')) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        setIsImporting(true);
+        try {
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const bstr = evt.target.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const importedData = {};
+
+                    // Mapeamento de nomes de abas para chaves do banco
+                    const sheetMap = {
+                        "Distribuidoras": "distributors",
+                        "Produtos": "products",
+                        "Preços": "prices",
+                        "Lista de Compras": "shopping_list"
+                    };
+
+                    wb.SheetNames.forEach(sheetName => {
+                        const key = sheetMap[sheetName];
+                        if (key) {
+                            importedData[key] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+                        }
+                    });
+
+                    if (Object.keys(importedData).length === 0) {
+                        throw new Error('Nenhum dado válido encontrado no arquivo.');
+                    }
+
+                    await importFullDatabase(importedData);
+                    alert('Banco de dados restaurado com sucesso!');
+                    window.location.reload();
+                } catch (err) {
+                    console.error(err);
+                    alert('Erro ao processar arquivo: ' + err.message);
+                    setIsImporting(false);
+                }
+            };
+            reader.readAsBinaryString(file);
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao importar dados: ' + error.message);
+            setIsImporting(false);
+        }
+    };
+
     return (
         <div className="main-content">
             <div className="page-header">
@@ -65,6 +161,52 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                {/* Backup e Restauração */}
+                <div className="card">
+                    <h3 className="card-title mb-lg"><Database size={20} /> Backup e Restauração</h3>
+                    <p className="text-muted mb-lg" style={{ fontSize: '0.85rem' }}>
+                        Exporte todo o seu banco de dados para segurança ou migração.
+                        O arquivo gerado contém distribuidoras, produtos, preços e sua lista de compras.
+                    </p>
+
+                    <div className="flex gap-md wrap">
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => handleExport('xlsx')}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <Download size={18} />}
+                            Exportar Excel (.xlsx)
+                        </button>
+
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => handleExport('csv')}
+                            disabled={isExporting}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <FileJson size={18} />}
+                            Exportar CSV (.csv)
+                        </button>
+
+                        <button
+                            className="btn btn-success"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                        >
+                            {isImporting ? <Loader size={18} className="loading-spinner" /> : <UploadIcon size={18} />}
+                            Importar Banco
+                        </button>
+
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleImport}
+                        />
                     </div>
                 </div>
             </div>
