@@ -130,47 +130,55 @@ export default function SettingsPage() {
                             "Preços": "prices",
                             "Lista de Compras": "shopping_list"
                         };
-
                         wb.SheetNames.forEach(sheetName => {
                             let key = sheetMap[sheetName];
                             const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
 
-                            // Se tiver apenas uma aba (como no CSV ou planilha simples), e não encontrou no map, 
-                            // tentamos detectar pelo cabeçalho
-                            if (!key && wb.SheetNames.length === 1 && sheetData.length > 0) {
-                                const headers = Object.keys(sheetData[0]).map(h => h.toLowerCase());
-                                if (headers.some(h => h.includes('nome') || h.includes('ean'))) {
-                                    key = 'products'; // Assume produtos se tiver nome ou ean
-                                }
-                                if (headers.some(h => h.includes('preço') || h.includes('valor'))) {
-                                    // Se tiver preço e não tiver nome, assume preços. 
-                                    // Se tiver os dois, produtos mapeia primeiro e podemos tentar duplicar ou escolher o melhor
-                                    if (!key) key = 'prices';
-                                }
+                            if (sheetData.length === 0) return;
+
+                            // Detectar cabeçalhos reais (fuzzy mapping)
+                            const sampleRow = sheetData[0];
+                            const colMap = {}; // tipo -> nome_coluna_real
+
+                            Object.keys(sampleRow).forEach(col => {
+                                const cleanCol = col.toLowerCase().trim();
+                                if (cleanCol.includes('produto') || cleanCol.includes('nome') || cleanCol === 'name') colMap.name = col;
+                                if (cleanCol.includes('preço') || cleanCol.includes('valor') || cleanCol === 'price') colMap.price = col;
+                                if (cleanCol.includes('ean') || cleanCol.includes('barras') || cleanCol.includes('codigo')) colMap.ean = col;
+                                if (cleanCol.includes('distribuidora') || cleanCol.includes('fornecedor')) colMap.distributor = col;
+                                if (cleanCol.includes('categoria')) colMap.category = col;
+                                if (cleanCol.includes('fabricante')) colMap.manufacturer = col;
+                            });
+
+                            // Se tiver apenas uma aba (como no CSV), e não encontrou no map, tenta detectar pelo que achou no colMap
+                            if (!key && wb.SheetNames.length === 1) {
+                                if (colMap.name) key = 'products';
+                                if (colMap.price && !key) key = 'prices';
                             }
 
                             if (!key) return;
 
-                            console.log(`Mapeando aba "${sheetName}" para "${key}" com ${sheetData.length} registros`);
+                            console.log(`Mapeando aba "${sheetName}" para "${key}". Colunas detectadas:`, colMap);
 
-                            // Mapeamento reverso para importar com nomes amigáveis
+                            // Mapeamento usando os cabeçalhos detectados
                             if (key === 'products') {
                                 importedData[key] = sheetData
                                     .map(row => ({
-                                        name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"] || row["PRODUTO"],
-                                        ean: String(row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"] || row["EAN"] || '').trim(),
-                                        category: row["Categoria"] || row["category"] || 'generico',
-                                        manufacturer: row["Fabricante"] || row["manufacturer"] || ''
+                                        name: row[colMap.name] || '',
+                                        ean: String(row[colMap.ean] || '').trim(),
+                                        category: row[colMap.category] || 'generico',
+                                        manufacturer: row[colMap.manufacturer] || ''
                                     }))
                                     .filter(p => p.name && String(p.name).trim().length > 0);
                             } else if (key === 'prices') {
                                 importedData[key] = sheetData
                                     .map(row => {
-                                        const priceRaw = row["Preço"] || row["price"] || row["valor"] || row["VALOR"] || '0';
+                                        const priceRaw = row[colMap.price] || '0';
                                         return {
                                             price: parseFloat(String(priceRaw).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.')),
-                                            name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"] || row["PRODUTO"], // Para o smart link
-                                            distributor: row["Distribuidora"] || row["distributor"] || row["DISTRIBUIDORA"],
+                                            name: row[colMap.name] || '', // Necessário para o smart link
+                                            ean: String(row[colMap.ean] || '').trim(), // Também incluímos EAN nos preços para melhor casamento
+                                            distributor: row[colMap.distributor] || '',
                                             ...row
                                         };
                                     })
