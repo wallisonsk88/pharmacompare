@@ -496,51 +496,78 @@ export const exportFullDatabase = async () => {
 // Função para importar dados em massa (restauração completa)
 export const importFullDatabase = async (data) => {
   try {
-    // 1. Limpar dados atuais
+    // Validação mínima: verificar se há algum dado para importar
+    const hasDistributors = data.distributors && data.distributors.length > 0;
+    const hasProducts = data.products && data.products.length > 0;
+    const hasPrices = data.prices && data.prices.length > 0;
+    const hasShopping = data.shopping_list && data.shopping_list.length > 0;
+
+    if (!hasDistributors && !hasProducts && !hasPrices && !hasShopping) {
+      throw new Error('O arquivo de importação não contém dados válidos ou reconhecidos.');
+    }
+
+    console.log('Iniciando importação...', {
+      distributors: data.distributors?.length || 0,
+      products: data.products?.length || 0,
+      prices: data.prices?.length || 0,
+      shopping: data.shopping_list?.length || 0
+    });
+
+    // 1. Limpar dados atuais (APENAS se tivermos algo novo para colocar)
     await clearAllData();
 
-    // 2. Importar distribuidoras (primeiro, por causa das chaves estrangeiras)
-    if (data.distributors && data.distributors.length > 0) {
+    // 2. Importar distribuidoras
+    if (hasDistributors) {
       if (isSupabaseConfigured) {
-        // No Supabase, se os IDs originais forem fornecidos, ele tentará usá-los. 
-        // Isso é bom para manter a integridade referencial do backup.
         const { error } = await supabase.from('distributors').insert(data.distributors);
-        if (error) throw error;
+        if (error) throw new Error('Erro ao inserir distribuidoras: ' + error.message);
       } else {
         localStorage.setItem(STORAGE_KEYS.distributors, JSON.stringify(data.distributors));
       }
     }
 
     // 3. Importar produtos
-    if (data.products && data.products.length > 0) {
+    if (hasProducts) {
       if (isSupabaseConfigured) {
         const { error } = await supabase.from('products').insert(data.products);
-        if (error) throw error;
+        if (error) throw new Error('Erro ao inserir produtos: ' + error.message);
       } else {
         localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data.products));
       }
     }
 
     // 4. Importar preços
-    if (data.prices && data.prices.length > 0) {
+    if (hasPrices) {
       if (isSupabaseConfigured) {
-        // Filtrar campos que vêm do SELECT join (products, distributors) mas não existem na tabela prices
+        // Filtrar campos que vêm do SELECT join (products, distributors) ou nomes amigáveis do export Excel
+        // Mantemos apenas colunas que REALMENTE existem na tabela prices
+        const validColumns = ['id', 'product_id', 'distributor_id', 'price', 'min_quantity', 'validity', 'recorded_at'];
+
         const rawPrices = data.prices.map(p => {
-          const { products, distributors, ...rest } = p;
-          return rest;
+          const cleanPrice = {};
+          validColumns.forEach(col => {
+            if (p[col] !== undefined) cleanPrice[col] = p[col];
+          });
+
+          // Se não tem product_id mas tem id (caso de backup fiel), mantém
+          // Se não tem nada disso, o insert vai falhar e o catch pega
+          return cleanPrice;
         });
-        const { error } = await supabase.from('prices').insert(rawPrices);
-        if (error) throw error;
+
+        if (rawPrices.length > 0) {
+          const { error } = await supabase.from('prices').insert(rawPrices);
+          if (error) throw new Error('Erro ao inserir preços: ' + error.message);
+        }
       } else {
         localStorage.setItem(STORAGE_KEYS.prices, JSON.stringify(data.prices));
       }
     }
 
     // 5. Importar lista de compras
-    if (data.shopping_list && data.shopping_list.length > 0) {
+    if (hasShopping) {
       if (isSupabaseConfigured) {
         const { error } = await supabase.from('shopping_list').insert(data.shopping_list);
-        if (error) throw error;
+        if (error) throw new Error('Erro ao inserir lista de compras: ' + error.message);
       } else {
         localStorage.setItem('pharmacompare_shopping_list', JSON.stringify(data.shopping_list));
       }
@@ -548,7 +575,134 @@ export const importFullDatabase = async (data) => {
 
     return true;
   } catch (error) {
-    console.error('Erro ao importar banco de dados:', error);
+    console.error('Erro detalhado na importação:', error);
+    throw error;
+  }
+};
+
+// Função para importar dados de forma inteligente (Merge/Upsert)
+// Útil para Planilhas Excel/CSV que não são backups completos
+export const smartImportFromSpreadsheet = async (data) => {
+  try {
+    const results = { success: 0, errors: 0, totals: { distributors: 0, products: 0, prices: 0 } };
+    const distMap = {}; // nome -> id
+    const prodMap = {}; // nome -> id
+
+    console.log('Iniciando smartImport...', {
+      distributors: data.distributors?.length || 0,
+      products: data.products?.length || 0,
+      prices: data.prices?.length || 0
+    });
+
+    // 1. Processar Distribuidoras (Aba/Lista explícita)
+    if (data.distributors && data.distributors.length > 0) {
+      for (const d of data.distributors) {
+        if (!d.name) continue;
+        try {
+          let { data: existing } = await supabase.from('distributors').select('id').eq('name', d.name).maybeSingle();
+          if (existing) {
+            distMap[d.name] = existing.id;
+          } else {
+            const { data: created } = await supabase.from('distributors').insert([{ name: d.name }]).select().single();
+            if (created) {
+              distMap[d.name] = created.id;
+              results.totals.distributors++;
+            }
+          }
+        } catch (e) { console.error('Erro dist:', e); }
+      }
+    }
+
+    // 2. Processar Produtos (Aba/Lista explícita)
+    if (data.products && data.products.length > 0) {
+      for (const p of data.products) {
+        if (!p.name) continue;
+        try {
+          let { data: existing } = await supabase.from('products').select('id').eq('name', p.name).maybeSingle();
+          if (existing) {
+            prodMap[p.name] = existing.id;
+            if (p.ean) await supabase.from('products').update({ ean: p.ean }).eq('id', existing.id);
+          } else {
+            const { data: created } = await supabase.from('products').insert([{
+              name: p.name,
+              ean: p.ean || null,
+              category: p.category || 'generico',
+              manufacturer: p.manufacturer || ''
+            }]).select().single();
+            if (created) {
+              prodMap[p.name] = created.id;
+              results.totals.products++;
+            }
+          }
+        } catch (e) { console.error('Erro prod:', e); }
+      }
+    }
+
+    // 3. Processar Preços e Criar Entidades on-the-fly se necessário
+    if (data.prices && data.prices.length > 0) {
+      const pricesToInsert = [];
+
+      for (const p of data.prices) {
+        try {
+          // A. Resolver Distribuidora
+          let distributor_id = p.distributor_id;
+          const dName = p.distributor || p["Distribuidora"] || p.name_distributor;
+
+          if (!distributor_id && dName) {
+            distributor_id = distMap[dName];
+            if (!distributor_id) {
+              let { data: existing } = await supabase.from('distributors').select('id').eq('name', dName).maybeSingle();
+              if (existing) {
+                distributor_id = existing.id;
+              } else {
+                const { data: created } = await supabase.from('distributors').insert([{ name: dName }]).select().single();
+                if (created) distributor_id = created.id;
+              }
+              if (distributor_id) distMap[dName] = distributor_id;
+            }
+          }
+
+          // B. Resolver Produto
+          let product_id = p.product_id;
+          const pName = p.name || p["Nome do Produto"] || p.product_name;
+          const pEan = p.ean || p["Código de Barras (EAN)"] || p.product_ean;
+
+          if (!product_id && pName) {
+            product_id = prodMap[pName];
+            if (!product_id) {
+              let { data: existing } = await supabase.from('products').select('id').eq('name', pName).maybeSingle();
+              if (existing) {
+                product_id = existing.id;
+              } else {
+                const { data: created } = await supabase.from('products').insert([{ name: pName, ean: pEan || null }]).select().single();
+                if (created) product_id = created.id;
+              }
+              if (product_id) prodMap[pName] = product_id;
+            }
+          }
+
+          // C. Adicionar à Lista de Inserção
+          if (product_id && distributor_id && p.price > 0) {
+            pricesToInsert.push({
+              product_id,
+              distributor_id,
+              price: p.price,
+              recorded_at: p.recorded_at || new Date().toISOString()
+            });
+          }
+        } catch (e) { console.error('Erro na linha de preço:', e); results.errors++; }
+      }
+
+      if (pricesToInsert.length > 0) {
+        const { error } = await supabase.from('prices').insert(pricesToInsert);
+        if (error) throw error;
+        results.totals.prices = pricesToInsert.length;
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Erro no smartImport:', error);
     throw error;
   }
 };

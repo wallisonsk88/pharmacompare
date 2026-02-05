@@ -1,6 +1,6 @@
 import React from 'react';
 import { Settings, Database, Palette, Bell, Shield, HelpCircle, Trash2, AlertTriangle, Download, Upload as UploadIcon, FileJson, Loader } from 'lucide-react';
-import { isSupabaseConfigured, clearAllData, exportFullDatabase, importFullDatabase } from '../config/supabase';
+import { isSupabaseConfigured, clearAllData, exportFullDatabase, importFullDatabase, smartImportFromSpreadsheet } from '../config/supabase';
 import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
@@ -121,6 +121,8 @@ export default function SettingsPage() {
                         const wb = XLSX.read(bstr, { type: 'binary' });
                         const importedData = {};
 
+                        console.log('Processando planilhas do Excel/CSV...', wb.SheetNames);
+
                         // Mapeamento de nomes de abas para chaves do banco
                         const sheetMap = {
                             "Distribuidoras": "distributors",
@@ -133,50 +135,62 @@ export default function SettingsPage() {
                             let key = sheetMap[sheetName];
                             const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
 
-                            // Se tiver apenas uma aba (como no CSV), e não encontrou no map, 
+                            // Se tiver apenas uma aba (como no CSV ou planilha simples), e não encontrou no map, 
                             // tentamos detectar pelo cabeçalho
                             if (!key && wb.SheetNames.length === 1 && sheetData.length > 0) {
                                 const headers = Object.keys(sheetData[0]).map(h => h.toLowerCase());
-                                if (headers.some(h => h.includes('nome do produto') || h.includes('código de barras (ean)') || h.includes('nome') || h.includes('ean'))) {
+                                if (headers.some(h => h.includes('nome') || h.includes('ean'))) {
                                     key = 'products'; // Assume produtos se tiver nome ou ean
-                                } else if (headers.some(h => h.includes('preço') || h.includes('valor'))) {
-                                    key = 'prices'; // Assume preços se tiver preço ou valor
+                                }
+                                if (headers.some(h => h.includes('preço') || h.includes('valor'))) {
+                                    // Se tiver preço e não tiver nome, assume preços. 
+                                    // Se tiver os dois, produtos mapeia primeiro e podemos tentar duplicar ou escolher o melhor
+                                    if (!key) key = 'prices';
                                 }
                             }
 
                             if (!key) return;
 
+                            console.log(`Mapeando aba "${sheetName}" para "${key}" com ${sheetData.length} registros`);
+
                             // Mapeamento reverso para importar com nomes amigáveis
                             if (key === 'products') {
                                 importedData[key] = sheetData
                                     .map(row => ({
-                                        name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"],
-                                        ean: String(row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"] || '').trim(),
+                                        name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"] || row["PRODUTO"],
+                                        ean: String(row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"] || row["EAN"] || '').trim(),
                                         category: row["Categoria"] || row["category"] || 'generico',
                                         manufacturer: row["Fabricante"] || row["manufacturer"] || ''
                                     }))
-                                    .filter(p => p.name && String(p.name).trim().length > 0); // FILTRO CRÍTICO: remove produtos sem nome
+                                    .filter(p => p.name && String(p.name).trim().length > 0);
                             } else if (key === 'prices') {
                                 importedData[key] = sheetData
-                                    .map(row => ({
-                                        price: parseFloat(String(row["Preço"] || row["price"] || row["valor"] || '0').replace(',', '.')),
-                                        ...row
-                                    }))
-                                    .filter(p => p.price > 0 && (p["product_id"] || p["Nome do Produto"] || p["name"])); // Filtro para preços válidos
+                                    .map(row => {
+                                        const priceRaw = row["Preço"] || row["price"] || row["valor"] || row["VALOR"] || '0';
+                                        return {
+                                            price: parseFloat(String(priceRaw).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.')),
+                                            name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"] || row["PRODUTO"], // Para o smart link
+                                            distributor: row["Distribuidora"] || row["distributor"] || row["DISTRIBUIDORA"],
+                                            ...row
+                                        };
+                                    })
+                                    .filter(p => p.price > 0 && (p["product_id"] || p.name));
                             } else {
                                 importedData[key] = sheetData;
                             }
                         });
 
                         if (Object.keys(importedData).length === 0) {
-                            throw new Error('Nenhum dado válido encontrado no arquivo.');
+                            throw new Error('Nenhum dado válido encontrado no arquivo. Verifique os nomes das colunas (Nome, Preço, EAN).');
                         }
 
-                        await importFullDatabase(importedData);
-                        alert('Banco de dados restaurado com sucesso!');
+                        console.log('Enviando para smartImport...', importedData);
+                        const result = await smartImportFromSpreadsheet(importedData);
+
+                        alert(`Importação concluída!\nProdutos: ${result.totals.products}\nPreços: ${result.totals.prices}\nDistribuidoras: ${result.totals.distributors}`);
                         window.location.reload();
                     } catch (err) {
-                        console.error(err);
+                        console.error('Erro no processamento do Excel:', err);
                         alert('Erro ao processar arquivo: ' + err.message);
                         setIsImporting(false);
                     }
