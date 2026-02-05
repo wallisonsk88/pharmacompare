@@ -131,15 +131,11 @@ export default function SettingsPage() {
                             "Lista de Compras": "shopping_list"
                         };
                         wb.SheetNames.forEach(sheetName => {
-                            let key = sheetMap[sheetName];
                             const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
-
                             if (sheetData.length === 0) return;
 
-                            // Detectar cabeçalhos reais (fuzzy mapping)
                             const sampleRow = sheetData[0];
-                            const colMap = {}; // tipo -> nome_coluna_real
-
+                            const colMap = {};
                             Object.keys(sampleRow).forEach(col => {
                                 const cleanCol = col.toLowerCase().trim();
                                 if (cleanCol.includes('produto') || cleanCol.includes('nome') || cleanCol === 'name') colMap.name = col;
@@ -150,42 +146,53 @@ export default function SettingsPage() {
                                 if (cleanCol.includes('fabricante')) colMap.manufacturer = col;
                             });
 
-                            // Se tiver apenas uma aba (como no CSV), e não encontrou no map, tenta detectar pelo que achou no colMap
-                            if (!key && wb.SheetNames.length === 1) {
-                                if (colMap.name) key = 'products';
-                                if (colMap.price && !key) key = 'prices';
-                            }
+                            // Determinar quais tipos de dados essa aba contém
+                            const possibleKeys = [];
+                            const mappedKey = sheetMap[sheetName];
 
-                            if (!key) return;
-
-                            console.log(`Mapeando aba "${sheetName}" para "${key}". Colunas detectadas:`, colMap);
-
-                            // Mapeamento usando os cabeçalhos detectados
-                            if (key === 'products') {
-                                importedData[key] = sheetData
-                                    .map(row => ({
-                                        name: row[colMap.name] || '',
-                                        ean: String(row[colMap.ean] || '').trim(),
-                                        category: row[colMap.category] || 'generico',
-                                        manufacturer: row[colMap.manufacturer] || ''
-                                    }))
-                                    .filter(p => p.name && String(p.name).trim().length > 0);
-                            } else if (key === 'prices') {
-                                importedData[key] = sheetData
-                                    .map(row => {
-                                        const priceRaw = row[colMap.price] || '0';
-                                        return {
-                                            price: parseFloat(String(priceRaw).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.')),
-                                            name: row[colMap.name] || '', // Necessário para o smart link
-                                            ean: String(row[colMap.ean] || '').trim(), // Também incluímos EAN nos preços para melhor casamento
-                                            distributor: row[colMap.distributor] || '',
-                                            ...row
-                                        };
-                                    })
-                                    .filter(p => p.price > 0 && (p["product_id"] || p.name));
+                            if (mappedKey) {
+                                possibleKeys.push(mappedKey);
                             } else {
-                                importedData[key] = sheetData;
+                                // Auto-detecção (pode ser múltiplos!)
+                                if (colMap.name) possibleKeys.push('products');
+                                if (colMap.price) possibleKeys.push('prices');
+                                if (colMap.distributor && !colMap.name && !colMap.price) possibleKeys.push('distributors');
                             }
+
+                            possibleKeys.forEach(key => {
+                                console.log(`Extraindo "${key}" da aba "${sheetName}". Colunas:`, colMap);
+
+                                if (!importedData[key]) importedData[key] = [];
+
+                                let extracted = [];
+                                if (key === 'products') {
+                                    extracted = sheetData
+                                        .map(row => ({
+                                            name: row[colMap.name] || '',
+                                            ean: String(row[colMap.ean] || '').trim(),
+                                            category: row[colMap.category] || 'generico',
+                                            manufacturer: row[colMap.manufacturer] || ''
+                                        }))
+                                        .filter(p => p.name && String(p.name).trim().length > 0);
+                                } else if (key === 'prices') {
+                                    extracted = sheetData
+                                        .map(row => {
+                                            const priceRaw = row[colMap.price] || '0';
+                                            return {
+                                                price: parseFloat(String(priceRaw).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.')),
+                                                name: row[colMap.name] || '',
+                                                ean: String(row[colMap.ean] || '').trim(),
+                                                distributor: row[colMap.distributor] || '',
+                                                ...row
+                                            };
+                                        })
+                                        .filter(p => p.price > 0 && (p["product_id"] || p.name));
+                                } else {
+                                    extracted = sheetData;
+                                }
+
+                                importedData[key] = [...importedData[key], ...extracted];
+                            });
                         });
 
                         if (Object.keys(importedData).length === 0) {
