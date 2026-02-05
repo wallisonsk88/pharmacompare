@@ -12,30 +12,56 @@ export default function SettingsPage() {
         setIsExporting(true);
         try {
             const data = await exportFullDatabase();
-            const wb = XLSX.utils.book_new();
 
-            // Adicionar cada tabela como uma aba no Excel
-            if (data.distributors) {
-                const ws = XLSX.utils.json_to_sheet(data.distributors);
-                XLSX.utils.book_append_sheet(wb, ws, "Distribuidoras");
-            }
-            if (data.products) {
-                const ws = XLSX.utils.json_to_sheet(data.products);
-                XLSX.utils.book_append_sheet(wb, ws, "Produtos");
-            }
-            if (data.prices) {
-                // Limpar campos de join para o export ser limpo
-                const cleanPrices = data.prices.map(({ products, distributors, ...rest }) => rest);
-                const ws = XLSX.utils.json_to_sheet(cleanPrices);
-                XLSX.utils.book_append_sheet(wb, ws, "Preços");
-            }
-            if (data.shopping_list) {
-                const ws = XLSX.utils.json_to_sheet(data.shopping_list);
-                XLSX.utils.book_append_sheet(wb, ws, "Lista de Compras");
-            }
+            if (format === 'json') {
+                const fileName = `pharmacompare_backup_${new Date().toISOString().split('T')[0]}.json`;
+                const jsonStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                URL.revokeObjectURL(url);
+            } else {
+                const wb = XLSX.utils.book_new();
 
-            const fileName = `pharmacompare_backup_${new Date().toISOString().split('T')[0]}.${format}`;
-            XLSX.writeFile(wb, fileName, { bookType: format });
+                // Adicionar cada tabela como uma aba no Excel
+                if (data.distributors) {
+                    const ws = XLSX.utils.json_to_sheet(data.distributors);
+                    XLSX.utils.book_append_sheet(wb, ws, "Distribuidoras");
+                }
+                if (data.products) {
+                    // Mapear campos para nomes amigáveis
+                    const productsForExport = data.products.map(p => ({
+                        "Nome do Produto": p.name || '',
+                        "Código de Barras (EAN)": p.ean || '',
+                        "Categoria": p.category || '',
+                        "Fabricante": p.manufacturer || ''
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(productsForExport);
+                    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+                }
+                if (data.prices) {
+                    // Mapear campos para nomes amigáveis incluindo nome do produto e EAN
+                    const pricesForExport = data.prices.map(p => ({
+                        "Nome do Produto": p.products?.name || '',
+                        "Código de Barras (EAN)": p.products?.ean || '',
+                        "Preço": p.price || 0,
+                        "Distribuidora": p.distributors?.name || '',
+                        "Data Registro": p.recorded_at ? new Date(p.recorded_at).toLocaleDateString() : ''
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(pricesForExport);
+                    XLSX.utils.book_append_sheet(wb, ws, "Preços");
+                }
+                if (data.shopping_list) {
+                    const ws = XLSX.utils.json_to_sheet(data.shopping_list);
+                    XLSX.utils.book_append_sheet(wb, ws, "Lista de Compras");
+                }
+
+                const fileName = `pharmacompare_export_${new Date().toISOString().split('T')[0]}.${format}`;
+                XLSX.writeFile(wb, fileName, { bookType: format });
+            }
 
             alert('Exportação concluída com sucesso!');
         } catch (error) {
@@ -56,42 +82,80 @@ export default function SettingsPage() {
 
         setIsImporting(true);
         try {
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                try {
-                    const bstr = evt.target.result;
-                    const wb = XLSX.read(bstr, { type: 'binary' });
-                    const importedData = {};
+            const fileName = file.name.toLowerCase();
 
-                    // Mapeamento de nomes de abas para chaves do banco
-                    const sheetMap = {
-                        "Distribuidoras": "distributors",
-                        "Produtos": "products",
-                        "Preços": "prices",
-                        "Lista de Compras": "shopping_list"
-                    };
-
-                    wb.SheetNames.forEach(sheetName => {
-                        const key = sheetMap[sheetName];
-                        if (key) {
-                            importedData[key] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
-                        }
-                    });
-
-                    if (Object.keys(importedData).length === 0) {
-                        throw new Error('Nenhum dado válido encontrado no arquivo.');
+            if (fileName.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const data = JSON.parse(evt.target.result);
+                        await importFullDatabase(data);
+                        alert('Banco de dados restaurado com sucesso!');
+                        window.location.reload();
+                    } catch (err) {
+                        alert('Erro ao processar JSON: ' + err.message);
+                        setIsImporting(false);
                     }
+                };
+                reader.readAsText(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const bstr = evt.target.result;
+                        const wb = XLSX.read(bstr, { type: 'binary' });
+                        const importedData = {};
 
-                    await importFullDatabase(importedData);
-                    alert('Banco de dados restaurado com sucesso!');
-                    window.location.reload();
-                } catch (err) {
-                    console.error(err);
-                    alert('Erro ao processar arquivo: ' + err.message);
-                    setIsImporting(false);
-                }
-            };
-            reader.readAsBinaryString(file);
+                        // Mapeamento de nomes de abas para chaves do banco
+                        const sheetMap = {
+                            "Distribuidoras": "distributors",
+                            "Produtos": "products",
+                            "Preços": "prices",
+                            "Lista de Compras": "shopping_list"
+                        };
+
+                        wb.SheetNames.forEach(sheetName => {
+                            const key = sheetMap[sheetName];
+                            if (!key) return;
+
+                            const sheetData = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+
+                            // Mapeamento reverso para importar com nomes amigáveis
+                            if (key === 'products') {
+                                importedData[key] = sheetData.map(row => ({
+                                    name: row["Nome do Produto"] || row["name"],
+                                    ean: row["Código de Barras (EAN)"] || row["ean"],
+                                    category: row["Categoria"] || row["category"],
+                                    manufacturer: row["Fabricante"] || row["manufacturer"]
+                                }));
+                            } else if (key === 'prices') {
+                                importedData[key] = sheetData.map(row => ({
+                                    price: row["Preço"] || row["price"],
+                                    // Outros campos dependem de joins, então no import simplificado 
+                                    // precisamos ter cuidado ou confiar no export JSON para backup total.
+                                    // Para Excel, buscaremos IDs se possível ou usaremos o que tiver.
+                                    ...row
+                                }));
+                            } else {
+                                importedData[key] = sheetData;
+                            }
+                        });
+
+                        if (Object.keys(importedData).length === 0) {
+                            throw new Error('Nenhum dado válido encontrado no arquivo.');
+                        }
+
+                        await importFullDatabase(importedData);
+                        alert('Banco de dados restaurado com sucesso!');
+                        window.location.reload();
+                    } catch (err) {
+                        console.error(err);
+                        alert('Erro ao processar arquivo: ' + err.message);
+                        setIsImporting(false);
+                    }
+                };
+                reader.readAsBinaryString(file);
+            }
         } catch (error) {
             console.error(error);
             alert('Erro ao importar dados: ' + error.message);
@@ -189,6 +253,16 @@ export default function SettingsPage() {
                         >
                             {isExporting ? <Loader size={18} className="loading-spinner" /> : <FileJson size={18} />}
                             Exportar CSV (.csv)
+                        </button>
+
+                        <button
+                            className="btn btn-tertiary"
+                            onClick={() => handleExport('json')}
+                            disabled={isExporting}
+                            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                        >
+                            {isExporting ? <Loader size={18} className="loading-spinner" /> : <Database size={18} />}
+                            Exportar JSON (.json)
                         </button>
 
                         <button
