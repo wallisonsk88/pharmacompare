@@ -148,20 +148,21 @@ export default function SettingsPage() {
 
                             // Mapeamento reverso para importar com nomes amigáveis
                             if (key === 'products') {
-                                importedData[key] = sheetData.map(row => ({
-                                    name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"],
-                                    ean: row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"],
-                                    category: row["Categoria"] || row["category"] || 'generico',
-                                    manufacturer: row["Fabricante"] || row["manufacturer"] || ''
-                                }));
+                                importedData[key] = sheetData
+                                    .map(row => ({
+                                        name: row["Nome do Produto"] || row["name"] || row["Nome"] || row["nome"],
+                                        ean: String(row["Código de Barras (EAN)"] || row["ean"] || row["Código de Barras"] || row["ean"] || '').trim(),
+                                        category: row["Categoria"] || row["category"] || 'generico',
+                                        manufacturer: row["Fabricante"] || row["manufacturer"] || ''
+                                    }))
+                                    .filter(p => p.name && String(p.name).trim().length > 0); // FILTRO CRÍTICO: remove produtos sem nome
                             } else if (key === 'prices') {
-                                importedData[key] = sheetData.map(row => ({
-                                    price: row["Preço"] || row["price"] || row["valor"],
-                                    // Outros campos dependem de joins, então no import simplificado 
-                                    // precisamos ter cuidado ou confiar no export JSON para backup total.
-                                    // Para Excel, buscaremos IDs se possível ou usaremos o que tiver.
-                                    ...row
-                                }));
+                                importedData[key] = sheetData
+                                    .map(row => ({
+                                        price: parseFloat(String(row["Preço"] || row["price"] || row["valor"] || '0').replace(',', '.')),
+                                        ...row
+                                    }))
+                                    .filter(p => p.price > 0 && (p["product_id"] || p["Nome do Produto"] || p["name"])); // Filtro para preços válidos
                             } else {
                                 importedData[key] = sheetData;
                             }
