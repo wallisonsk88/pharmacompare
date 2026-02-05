@@ -103,16 +103,16 @@ export default function ShoppingList() {
         const existingItem = list.find(item => item.product_id === product.id);
 
         if (existingItem) {
-            // Atualizar quantidade
+            // Atualizar quantidade e mover para o topo
             const newQty = existingItem.quantity + 1;
             try {
                 await updateShoppingItem(existingItem.id, { ...existingItem, quantity: newQty });
-                setList(list.map(item =>
-                    item.product_id === product.id ? { ...item, quantity: newQty } : item
-                ));
+                // Remove o item da posição atual e coloca no topo
+                const otherItems = list.filter(item => item.product_id !== product.id);
+                setList([{ ...existingItem, quantity: newQty }, ...otherItems]);
             } catch (e) { console.error(e); }
         } else {
-            // Adicionar novo item
+            // Adicionar novo item no topo
             const newItem = {
                 product_id: product.id,
                 name: product.name,
@@ -126,7 +126,7 @@ export default function ShoppingList() {
             };
             try {
                 const savedItem = await addShoppingItem(newItem);
-                setList([...list, { ...newItem, id: savedItem.id }]);
+                setList([{ ...newItem, id: savedItem.id }, ...list]);
             } catch (e) { console.error(e); }
         }
         setSearchTerm('');

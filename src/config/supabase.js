@@ -415,7 +415,7 @@ export const getShoppingList = async () => {
     const { data, error } = await supabase
       .from('shopping_list')
       .select('*')
-      .order('created_at');
+      .order('updated_at', { ascending: false });
     if (error) throw error;
     return data || [];
   }
@@ -438,7 +438,8 @@ export const addShoppingItem = async (item) => {
         distributor_name: item.distributor_name,
         quantity: item.quantity || 1,
         last_price: item.last_price,
-        last_distributor: item.last_distributor
+        last_distributor: item.last_distributor,
+        updated_at: new Date().toISOString()
       }])
       .select()
       .single();
