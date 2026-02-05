@@ -35,12 +35,26 @@ const setLocalData = (key, data) => {
 // DISTRIBUIDORAS
 export const getDistributors = async () => {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('distributors')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    return data;
+    let allDistributors = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('distributors')
+        .select('*')
+        .order('name')
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allDistributors = allDistributors.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+
+    return allDistributors;
   }
   return getLocalData('distributors');
 };
@@ -209,17 +223,30 @@ export const deleteProduct = async (id) => {
 // PREÇOS
 export const getPrices = async () => {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('prices')
-      .select(`
-        *,
-        products:product_id(*),
-        distributors:distributor_id(*)
-      `)
-      .order('recorded_at', { ascending: false })
-      .range(0, 50000); // Supabase limita a 1000 por padrão
-    if (error) throw error;
-    return data;
+    let allPrices = [];
+    let from = 0;
+    const batchSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('prices')
+        .select(`
+          *,
+          products:product_id(*),
+          distributors:distributor_id(*)
+        `)
+        .order('recorded_at', { ascending: false })
+        .range(from, from + batchSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allPrices = allPrices.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+
+    return allPrices;
   }
   const prices = getLocalData('prices');
   const products = getLocalData('products');
