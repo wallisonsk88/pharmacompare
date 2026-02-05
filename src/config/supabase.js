@@ -582,60 +582,88 @@ export const importFullDatabase = async (data) => {
 
 // Função para importar dados de forma inteligente (Merge/Upsert)
 // Útil para Planilhas Excel/CSV que não são backups completos
-// Função para importar dados de forma inteligente (Merge/Upsert) - VERSÃO OTIMIZADA PARA VELOCIDADE
+// Função para importar dados de forma inteligente (Merge/Upsert) - VERSÃO OTIMIZADA PARA VELOCIDADE E GRANDES DATASETS
 export const smartImportFromSpreadsheet = async (data) => {
   try {
     const results = { success: 0, errors: 0, totals: { distributors: 0, products: 0, prices: 0 } };
 
-    console.log('Iniciando smartImport Otimizado...', {
+    console.log('Iniciando smartImport Otimizado V2...', {
       distributors: data.distributors?.length || 0,
       products: data.products?.length || 0,
       prices: data.prices?.length || 0
     });
 
-    // 1. Carregar Caches iniciais (Batch Fetch)
-    // Buscamos tudo de uma vez para evitar milhares de selects no loop
-    const [{ data: allDistributors }, { data: allProducts }] = await Promise.all([
-      supabase.from('distributors').select('id, name'),
-      supabase.from('products').select('id, name, ean')
+    // 1. Carregar Caches iniciais (Batch Fetch com Paginação para > 1000 itens)
+    const fetchAll = async (table, select = '*') => {
+      let items = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data: batch, error } = await supabase.from(table).select(select).range(from, from + step - 1);
+        if (error) throw error;
+        if (!batch || batch.length === 0) break;
+        items = [...items, ...batch];
+        if (batch.length < step) break;
+        from += step;
+      }
+      return items;
+    };
+
+    const [allDistributors, allProducts] = await Promise.all([
+      fetchAll('distributors', 'id, name'),
+      fetchAll('products', 'id, name, ean')
     ]);
 
-    const distMap = new Map(allDistributors?.map(d => [d.name.toLowerCase().trim(), d.id]) || []);
-    const prodMap = new Map(allProducts?.map(p => [p.name.toLowerCase().trim(), p.id]) || []);
-    const eanMap = new Map(allProducts?.filter(p => p.ean).map(p => [p.ean.trim(), p.id]) || []);
+    const normalize = (s) => String(s || '').toLowerCase().trim();
+
+    const distMap = new Map(allDistributors.map(d => [normalize(d.name), d.id]));
+    const prodMap = new Map(allProducts.map(p => [normalize(p.name), p.id]));
+    const eanMap = new Map(allProducts.filter(p => p.ean).map(p => [String(p.ean).trim(), p.id]));
 
     // 2. Processar Distribuidoras (Inserção em Lote)
     if (data.distributors && data.distributors.length > 0) {
       const newDists = data.distributors
-        .filter(d => d.name && !distMap.has(d.name.toLowerCase().trim()))
+        .filter(d => d.name && !distMap.has(normalize(d.name)))
         .map(d => ({ name: d.name.trim() }));
 
       if (newDists.length > 0) {
         const { data: created, error } = await supabase.from('distributors').insert(newDists).select();
         if (error) throw error;
-        created.forEach(d => distMap.set(d.name.toLowerCase().trim(), d.id));
+        created.forEach(d => distMap.set(normalize(d.name), d.id));
         results.totals.distributors = newDists.length;
       }
     }
 
     // 3. Processar Produtos (Inserção em Lote)
     if (data.products && data.products.length > 0) {
-      const newProds = data.products
-        .filter(p => p.name && !prodMap.has(p.name.toLowerCase().trim()))
-        .map(p => ({
-          name: p.name.trim(),
-          ean: p.ean || null,
-          category: p.category || 'generico',
-          manufacturer: p.manufacturer || ''
-        }));
+      const newProds = [];
+      for (const p of data.products) {
+        const normName = normalize(p.name);
+        const normEan = String(p.ean || '').trim();
+
+        // Tentar encontrar por Nome ou EAN (se tiver)
+        const existingId = prodMap.get(normName) || (normEan ? eanMap.get(normEan) : null);
+
+        if (!existingId && p.name) {
+          newProds.push({
+            name: p.name.trim(),
+            ean: p.ean || null,
+            category: p.category || 'generico',
+            manufacturer: p.manufacturer || ''
+          });
+        } else if (existingId && p.ean && !eanMap.has(normEan)) {
+          // Atualizar EAN se existir o produto mas não o código
+          await supabase.from('products').update({ ean: p.ean }).eq('id', existingId);
+          eanMap.set(normEan, existingId);
+        }
+      }
 
       if (newProds.length > 0) {
-        // Supabase insert returns what was created
         const { data: created, error } = await supabase.from('products').insert(newProds).select();
         if (error) throw error;
         created.forEach(p => {
-          prodMap.set(p.name.toLowerCase().trim(), p.id);
-          if (p.ean) eanMap.set(p.ean.trim(), p.id);
+          prodMap.set(normalize(p.name), p.id);
+          if (p.ean) eanMap.set(String(p.ean).trim(), p.id);
         });
         results.totals.products = newProds.length;
       }
@@ -645,28 +673,27 @@ export const smartImportFromSpreadsheet = async (data) => {
     if (data.prices && data.prices.length > 0) {
       const pricesToInsert = [];
 
-      // Itera sobre os preços e mapeia os IDs usando nosso cache em memória
       for (const p of data.prices) {
         try {
-          const dName = (p.distributor || p["Distribuidora"] || p.name_distributor || 'Importado').toLowerCase().trim();
-          const pName = (p.name || p["Nome do Produto"] || p.product_name || '').toLowerCase().trim();
+          const dName = normalize(p.distributor || p["Distribuidora"] || p.name_distributor || 'Importado');
+          const pName = normalize(p.name || p["Nome do Produto"] || p.product_name);
           const pEan = String(p.ean || p["Código de Barras (EAN)"] || p.product_ean || '').trim();
 
-          // Tentar encontrar Distribuidora
+          // A. Resolver Distribuidora
           let distributor_id = distMap.get(dName);
           if (!distributor_id && dName) {
-            // Se não existe, cria agora (raro se o step 2 foi robusto)
-            const { data: newDist } = await supabase.from('distributors').insert([{ name: dName }]).select().single();
+            const { data: newDist, error: dErr } = await supabase.from('distributors').insert([{ name: p.distributor || p["Distribuidora"] || 'Importado' }]).select().single();
             if (newDist) {
               distributor_id = newDist.id;
               distMap.set(dName, distributor_id);
             }
           }
 
-          // Tentar encontrar Produto (por Nome ou EAN)
+          // B. Resolver Produto (Nome -> EAN)
           let product_id = prodMap.get(pName) || (pEan ? eanMap.get(pEan) : null);
+
           if (!product_id && pName) {
-            const { data: newProd } = await supabase.from('products').insert([{ name: pName, ean: pEan || null }]).select().single();
+            const { data: newProd } = await supabase.from('products').insert([{ name: p.name || p["Nome do Produto"], ean: pEan || null }]).select().single();
             if (newProd) {
               product_id = newProd.id;
               prodMap.set(pName, product_id);
@@ -686,7 +713,6 @@ export const smartImportFromSpreadsheet = async (data) => {
       }
 
       if (pricesToInsert.length > 0) {
-        // Inserção em massa dos preços (Supabase suporta até milhares de linhas por vez)
         const { error } = await supabase.from('prices').insert(pricesToInsert);
         if (error) throw error;
         results.totals.prices = pricesToInsert.length;
