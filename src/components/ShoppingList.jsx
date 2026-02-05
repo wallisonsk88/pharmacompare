@@ -328,7 +328,7 @@ export default function ShoppingList() {
                                             <Package size={16} />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600 }}>{product.name}</div>
+                                            <div style={{ fontWeight: 600, color: '#fff' }}>{product.name}</div>
                                             <div className="text-muted" style={{ fontSize: '0.75rem' }}>
                                                 {lastPrice ? (
                                                     <span style={{ color: 'var(--accent-success)' }}>
@@ -375,7 +375,7 @@ export default function ShoppingList() {
                                     {list.map(item => (
                                         <tr key={item.product_id}>
                                             <td>
-                                                <div style={{ fontWeight: 600 }}>{item.name}</div>
+                                                <div style={{ fontWeight: 600, color: '#fff' }}>{item.name}</div>
                                                 {item.last_price && (
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--accent-info)' }}>
                                                         Último: {formatCurrency(item.last_price)} ({item.last_distributor})
